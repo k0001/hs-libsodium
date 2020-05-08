@@ -1,0 +1,4 @@
+compiler: ghc
+tests: True
+packages:
+  libsodium/
