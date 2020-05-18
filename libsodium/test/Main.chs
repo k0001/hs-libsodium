@@ -1,3 +1,5 @@
+{-# LANGUAGE BangPatterns #-}
+{-# LANGUAGE ScopedTypeVariables #-}
 #include <sodium.h>
 
 module Main (main) where
@@ -6,6 +8,8 @@ import Control.Monad
 import Control.Monad.IO.Class
 import Foreign.C.String
 import Foreign.C.Types
+import Foreign.ForeignPtr
+import Foreign.Storable
 import qualified Test.Tasty as Tasty
 import qualified Test.Tasty.Runners as Tasty
 import Test.Tasty (TestTree, testGroup)
@@ -68,6 +72,39 @@ tt_libsodium = testGroup "libsodium"
   [ tt_core
   , tt_constants
   , tt_randombytes
+  , tt_storable
+  ]
+
+tt_storable :: TestTree
+tt_storable = testGroup "Storable"
+  [ testCase "alloc" $ do
+      _ :: ForeignPtr L.Crypto_hash_sha256_state <- mallocForeignPtr
+      pure ()
+
+  , testCase "peek" $ do
+      -- Allocate s1 and fill with random bytes
+      s1 <- L.crypto_hash_sha256_state'malloc
+      L.crypto_hash_sha256_state'ptr s1 $ \p1 -> do
+        L.randombytes_buf p1 (fromIntegral (sizeOf s1))
+        -- Allocate s2 by peeking from s1
+        s2 <- peek p1
+        L.crypto_hash_sha256_state'ptr s2 $ \p2 -> do
+          -- Compare s1 and s2
+          x <- L.sodium_memcmp p1 p2 (fromIntegral (sizeOf s1))
+          0 @=? x
+
+  , testCase "poke" $ do
+      -- Allocate s1 and fill with random bytes
+      s1 <- L.crypto_hash_sha256_state'malloc
+      L.crypto_hash_sha256_state'ptr s1 $ \p1 -> do
+        L.randombytes_buf p1 (fromIntegral (sizeOf s1))
+        -- Allocate s2 and poke s1 into it
+        s2 <- L.crypto_hash_sha256_state'malloc
+        L.crypto_hash_sha256_state'ptr s2 $ \p2 -> do
+          poke p2 s1
+          -- Compare s1 and s2
+          x <- L.sodium_memcmp p1 p2 (fromIntegral (sizeOf s1))
+          0 @=? x
   ]
 
 tt_core :: TestTree
