@@ -13,6 +13,7 @@ let
         (super.callPackage ../libsodium/pkg.nix { inherit (pkgs) libsodium; });
       _shell = super.shellFor {
         withHoogle = true;
+        buildInputs = [ pkgs.cabal-install ];
         packages = p: [ p.libsodium ];
       };
     };
