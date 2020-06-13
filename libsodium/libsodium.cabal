@@ -20,6 +20,7 @@ common basic
   ghc-options: -Wall -Werror=incomplete-patterns
   build-depends: base == 4.*
   pkgconfig-depends: libsodium == 1.0.18
+  build-tool-depends: c2hs:c2hs
 
 library
   import: basic

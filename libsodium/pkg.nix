@@ -9,6 +9,7 @@ mkDerivation {
   libraryPkgconfigDepends = [ libsodium ];
   testHaskellDepends = [ base hedgehog tasty tasty-hedgehog tasty-hunit ];
   testPkgconfigDepends = [ libsodium ];
+  testToolDepends = [ c2hs ];
   homepage = "https://github.com/k0001/hs-libsodium";
   description = "Low-level bindings to the libsodium C library";
   license = stdenv.lib.licenses.isc;
