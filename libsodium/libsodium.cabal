@@ -1,6 +1,6 @@
 cabal-version: 2.4
 name: libsodium
-version: 1.0.18.1
+version: 1.0.18.2
 license: ISC
 license-file: LICENSE
 extra-source-files: README.md CHANGELOG.md
@@ -9,34 +9,61 @@ maintainer: renλren.zone
 copyright: Copyright (c) Renzo Carbonara 2020
 category: Cryptography
 build-type: Simple
-synopsis: Low-level bindings to the libsodium C library
-description: Low-level bindings to the libsodium C library
+synopsis: Low-level bindings to the libsodium cryptography library for GHC and GHCJS
+description: Low-level bindings to the libsodium cryptography library for GHC and GHCJS
 homepage: https://github.com/k0001/hs-libsodium
 bug-reports: https://github.com/k0001/hs-libsodium/issues
 tested-with: GHC == 8.6.5, GHC == 8.8.3, GHC == 8.10.1
 
+flag js-compat
+  description: Whether to export symbols and constants compatible with
+               JavaScript's libsodium implementation. This is useful if
+               you are using libsodium with both GHCJS and GHC at the
+               same time.
+  default: False
+  manual: True
+
 common basic
   default-language: Haskell2010
-  ghc-options: -Wall -Werror=incomplete-patterns
+  ghc-options: -Wall -Werror=incomplete-patterns -Werror=dodgy-imports
+  ghcjs-options: -Wall -Werror=incomplete-patterns -Werror=dodgy-imports
   build-depends: base == 4.*
   pkgconfig-depends: libsodium == 1.0.18
+  -- TODO figure out how to prevent Cabal from trying to download this.
   build-tool-depends: c2hs:c2hs
+  if flag(js-compat) || impl(ghcjs)
+    cpp-options: -DLIBSODIUM_JS_COMPAT
+  if impl(ghcjs)
+    -- This is necessary to make sure c2hs picks up ghcjs_HOST_OS too.
+    cpp-options: -Dghcjs_HOST_OS
+  default-extensions:
+    BangPatterns
+    DataKinds
+    DerivingStrategies
+    FlexibleContexts
+    GeneralizedNewtypeDeriving
+    KindSignatures
+    OverloadedStrings
+    ScopedTypeVariables
+    TypeApplications
+    TypeFamilies
+    TypeOperators
 
 library
   import: basic
-  hs-source-dirs: lib
+  hs-source-dirs: hs-lib
   exposed-modules: Libsodium
-  other-modules: Libsodium.Constants
+  other-modules: Libsodium.Constants, Libsodium.Functions, Libsodium.Types
+  if impl(ghcjs)
+    build-depends: ghcjs-base, foreign-emscripten
+    other-modules: Libsodium.GHCJS
+    include-dirs: js-dist
+    js-sources: js-dist/index.js
 
 test-suite test
   import: basic
   type: exitcode-stdio-1.0
   hs-source-dirs: test
   main-is: Main.hs
-  build-depends:
-    hedgehog,
-    libsodium,
-    tasty,
-    tasty-hedgehog,
-    tasty-hunit,
-
+  other-modules: Libsodium.Test
+  build-depends: hedgehog, libsodium, tasty, tasty-hedgehog, tasty-hunit

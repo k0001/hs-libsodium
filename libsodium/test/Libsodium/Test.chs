@@ -1,21 +1,22 @@
-{-# LANGUAGE BangPatterns #-}
-{-# LANGUAGE ScopedTypeVariables #-}
+{-# LANGUAGE CPP #-}
 #include <sodium.h>
 
-module Main (main) where
+module Libsodium.Test where
 
 import Control.Monad
 import Control.Monad.IO.Class
+import Data.Char (ord)
+import Data.Word
 import Foreign.C.String
 import Foreign.C.Types
+import Foreign.Ptr
 import Foreign.ForeignPtr
+import Foreign.Marshal.Array
 import Foreign.Storable
-import qualified Test.Tasty as Tasty
-import qualified Test.Tasty.Runners as Tasty
 import Test.Tasty (TestTree, testGroup)
-import Test.Tasty.HUnit (testCase, (@=?), (@?))
+import Test.Tasty.HUnit (testCase, assertBool, (@=?), (@?))
 import Test.Tasty.Hedgehog (testProperty)
-import Hedgehog (property, forAll, (/==), diff)
+import Hedgehog (MonadGen, property, forAll, (===), (/==), diff)
 import qualified Hedgehog.Gen as Gen
 import qualified Hedgehog.Range as Range
 import qualified Libsodium as L
@@ -61,18 +62,63 @@ import qualified Libsodium as L
 
 --------------------------------------------------------------------------------
 
-main :: IO ()
-main = Tasty.defaultMainWithIngredients
-    [ Tasty.consoleTestReporter
-    , Tasty.listingTests
-    ] tt_libsodium
+tt_custom :: TestTree
+tt_custom = testGroup "custom"
+  [ testProperty "memcmp" $ property $ do
+      str0 <- forAll $ Gen.string (Range.constant 0 100) genChar8
+      let slen = length str0
+      str1 <- forAll $ Gen.string (Range.singleton slen) genChar8
+      (r00, r11, r01, r10) <- liftIO $
+         withCString str0 $ \p0 ->
+         withCString str1 $ \p1 -> (,,,)
+           <$> L.sodium_memcmp p0 p0 (fromIntegral slen + 1)
+           <*> L.sodium_memcmp p1 p1 (fromIntegral slen + 1)
+           <*> L.sodium_memcmp p0 p1 (fromIntegral slen + 1)
+           <*> L.sodium_memcmp p1 p0 (fromIntegral slen + 1)
+      r00 === 0
+      r11 === 0
+      r01 === if str0 == str1 then 0 else -1
+      r01 === r10
 
-tt_libsodium :: TestTree
-tt_libsodium = testGroup "libsodium"
-  [ tt_core
-  , tt_constants
-  , tt_randombytes
-  , tt_storable
+  , testProperty "memzero" $ property $ do
+      l0 :: [Word8] <- forAll $ Gen.list (Range.constant 0 100) Gen.enumBounded
+      let len = length l0
+      (l1, l2) <- liftIO $ allocaArray len $ \p0 -> do
+        pokeArray p0 l0
+        l1 <- peekArray len p0
+        L.sodium_memzero p0 (fromIntegral len)
+        l2 <- peekArray len p0
+        pure (l1, l2)
+      l0 === l1
+      l2 === replicate len 0x00
+
+  , testProperty "mem_is_zero: random" $ property $ do
+      l0 :: [Word8] <- forAll $ Gen.list (Range.constant 0 100) Gen.enumBounded
+      let len = length l0
+      (l1, res, l2) <- liftIO $ allocaArray len $ \p0 -> do
+        pokeArray p0 l0
+        l1 <- peekArray len p0
+        res <- L.sodium_is_zero (castPtr p0) (fromIntegral len)
+        l2 :: [Word8] <- peekArray len p0
+        pure (l1, res, l2)
+      l0 === l1
+      l0 === l2
+      res === if all (== 0x00) l0 then 1 else 0
+
+  , testProperty "mem_is_zero: zeros" $ property $ do
+      len <- forAll $ Gen.int (Range.constant 0 100)
+      res <- liftIO $ allocaArray len $ \p0 -> do
+        pokeArray p0 (replicate len 0x00 :: [Word8])
+        L.sodium_is_zero (castPtr p0) (fromIntegral len)
+      res === 1
+
+  , testProperty "mem_is_zero: non-zeros" $ property $ do
+      len <- forAll $ Gen.int (Range.constant 1 100)
+      i <- forAll $ Gen.int (Range.constant 0 (len - 1))
+      res <- liftIO $ allocaArray len $ \p0 -> do
+        pokeByteOff (p0 :: Ptr Word8) i (0x89 :: Word8)
+        L.sodium_is_zero (castPtr p0) (fromIntegral len)
+      res === 0
   ]
 
 tt_storable :: TestTree
@@ -125,25 +171,19 @@ tt_constants = testGroup "constants"
 tt_constants_numbers :: TestTree
 tt_constants_numbers = testGroup "numbers"
   [ t "randombytes_seedbytes" L.randombytes_seedbytes {# call pure unsafe randombytes_seedbytes #}
-  , t "crypto_aead_aes256gcm_abytes" L.crypto_aead_aes256gcm_abytes {# call pure unsafe crypto_aead_aes256gcm_abytes #}
-  , t "crypto_aead_aes256gcm_keybytes" L.crypto_aead_aes256gcm_keybytes {# call pure unsafe crypto_aead_aes256gcm_keybytes #}
-  , t "crypto_aead_aes256gcm_messagebytes_max" L.crypto_aead_aes256gcm_messagebytes_max {# call pure unsafe crypto_aead_aes256gcm_messagebytes_max #}
-  , t "crypto_aead_aes256gcm_npubbytes" L.crypto_aead_aes256gcm_npubbytes {# call pure unsafe crypto_aead_aes256gcm_npubbytes #}
-  , t "crypto_aead_aes256gcm_nsecbytes" L.crypto_aead_aes256gcm_nsecbytes {# call pure unsafe crypto_aead_aes256gcm_nsecbytes #}
-  , t "crypto_aead_aes256gcm_statebytes" L.crypto_aead_aes256gcm_statebytes {# call pure unsafe crypto_aead_aes256gcm_statebytes #}
   , t "crypto_aead_chacha20poly1305_abytes" L.crypto_aead_chacha20poly1305_abytes {# call pure unsafe crypto_aead_chacha20poly1305_abytes #}
   , t "crypto_aead_chacha20poly1305_ietf_abytes" L.crypto_aead_chacha20poly1305_ietf_abytes {# call pure unsafe crypto_aead_chacha20poly1305_ietf_abytes #}
   , t "crypto_aead_chacha20poly1305_ietf_keybytes" L.crypto_aead_chacha20poly1305_ietf_keybytes {# call pure unsafe crypto_aead_chacha20poly1305_ietf_keybytes #}
-  , t "crypto_aead_chacha20poly1305_ietf_messagebytes_max" L.crypto_aead_chacha20poly1305_ietf_messagebytes_max {# call pure unsafe crypto_aead_chacha20poly1305_ietf_messagebytes_max #}
+  , z "crypto_aead_chacha20poly1305_ietf_messagebytes_max" L.crypto_aead_chacha20poly1305_ietf_messagebytes_max {# call pure unsafe crypto_aead_chacha20poly1305_ietf_messagebytes_max #}
   , t "crypto_aead_chacha20poly1305_ietf_npubbytes" L.crypto_aead_chacha20poly1305_ietf_npubbytes {# call pure unsafe crypto_aead_chacha20poly1305_ietf_npubbytes #}
   , t "crypto_aead_chacha20poly1305_ietf_nsecbytes" L.crypto_aead_chacha20poly1305_ietf_nsecbytes {# call pure unsafe crypto_aead_chacha20poly1305_ietf_nsecbytes #}
   , t "crypto_aead_chacha20poly1305_keybytes" L.crypto_aead_chacha20poly1305_keybytes {# call pure unsafe crypto_aead_chacha20poly1305_keybytes #}
-  , t "crypto_aead_chacha20poly1305_messagebytes_max" L.crypto_aead_chacha20poly1305_messagebytes_max {# call pure unsafe crypto_aead_chacha20poly1305_messagebytes_max #}
+  , z "crypto_aead_chacha20poly1305_messagebytes_max" L.crypto_aead_chacha20poly1305_messagebytes_max {# call pure unsafe crypto_aead_chacha20poly1305_messagebytes_max #}
   , t "crypto_aead_chacha20poly1305_npubbytes" L.crypto_aead_chacha20poly1305_npubbytes {# call pure unsafe crypto_aead_chacha20poly1305_npubbytes #}
   , t "crypto_aead_chacha20poly1305_nsecbytes" L.crypto_aead_chacha20poly1305_nsecbytes {# call pure unsafe crypto_aead_chacha20poly1305_nsecbytes #}
   , t "crypto_aead_xchacha20poly1305_ietf_abytes" L.crypto_aead_xchacha20poly1305_ietf_abytes {# call pure unsafe crypto_aead_xchacha20poly1305_ietf_abytes #}
   , t "crypto_aead_xchacha20poly1305_ietf_keybytes" L.crypto_aead_xchacha20poly1305_ietf_keybytes {# call pure unsafe crypto_aead_xchacha20poly1305_ietf_keybytes #}
-  , t "crypto_aead_xchacha20poly1305_ietf_messagebytes_max" L.crypto_aead_xchacha20poly1305_ietf_messagebytes_max {# call pure unsafe crypto_aead_xchacha20poly1305_ietf_messagebytes_max #}
+  , z "crypto_aead_xchacha20poly1305_ietf_messagebytes_max" L.crypto_aead_xchacha20poly1305_ietf_messagebytes_max {# call pure unsafe crypto_aead_xchacha20poly1305_ietf_messagebytes_max #}
   , t "crypto_aead_xchacha20poly1305_ietf_npubbytes" L.crypto_aead_xchacha20poly1305_ietf_npubbytes {# call pure unsafe crypto_aead_xchacha20poly1305_ietf_npubbytes #}
   , t "crypto_aead_xchacha20poly1305_ietf_nsecbytes" L.crypto_aead_xchacha20poly1305_ietf_nsecbytes {# call pure unsafe crypto_aead_xchacha20poly1305_ietf_nsecbytes #}
   , t "crypto_auth_bytes" L.crypto_auth_bytes {# call pure unsafe crypto_auth_bytes #}
@@ -161,7 +201,7 @@ tt_constants_numbers = testGroup "numbers"
   , t "crypto_box_boxzerobytes" L.crypto_box_boxzerobytes {# call pure unsafe crypto_box_boxzerobytes #}
   , t "crypto_box_curve25519xchacha20poly1305_beforenmbytes" L.crypto_box_curve25519xchacha20poly1305_beforenmbytes {# call pure unsafe crypto_box_curve25519xchacha20poly1305_beforenmbytes #}
   , t "crypto_box_curve25519xchacha20poly1305_macbytes" L.crypto_box_curve25519xchacha20poly1305_macbytes {# call pure unsafe crypto_box_curve25519xchacha20poly1305_macbytes #}
-  , t "crypto_box_curve25519xchacha20poly1305_messagebytes_max" L.crypto_box_curve25519xchacha20poly1305_messagebytes_max {# call pure unsafe crypto_box_curve25519xchacha20poly1305_messagebytes_max #}
+  , z "crypto_box_curve25519xchacha20poly1305_messagebytes_max" L.crypto_box_curve25519xchacha20poly1305_messagebytes_max {# call pure unsafe crypto_box_curve25519xchacha20poly1305_messagebytes_max #}
   , t "crypto_box_curve25519xchacha20poly1305_noncebytes" L.crypto_box_curve25519xchacha20poly1305_noncebytes {# call pure unsafe crypto_box_curve25519xchacha20poly1305_noncebytes #}
   , t "crypto_box_curve25519xchacha20poly1305_publickeybytes" L.crypto_box_curve25519xchacha20poly1305_publickeybytes {# call pure unsafe crypto_box_curve25519xchacha20poly1305_publickeybytes #}
   , t "crypto_box_curve25519xchacha20poly1305_sealbytes" L.crypto_box_curve25519xchacha20poly1305_sealbytes {# call pure unsafe crypto_box_curve25519xchacha20poly1305_sealbytes #}
@@ -170,14 +210,14 @@ tt_constants_numbers = testGroup "numbers"
   , t "crypto_box_curve25519xsalsa20poly1305_beforenmbytes" L.crypto_box_curve25519xsalsa20poly1305_beforenmbytes {# call pure unsafe crypto_box_curve25519xsalsa20poly1305_beforenmbytes #}
   , t "crypto_box_curve25519xsalsa20poly1305_boxzerobytes" L.crypto_box_curve25519xsalsa20poly1305_boxzerobytes {# call pure unsafe crypto_box_curve25519xsalsa20poly1305_boxzerobytes #}
   , t "crypto_box_curve25519xsalsa20poly1305_macbytes" L.crypto_box_curve25519xsalsa20poly1305_macbytes {# call pure unsafe crypto_box_curve25519xsalsa20poly1305_macbytes #}
-  , t "crypto_box_curve25519xsalsa20poly1305_messagebytes_max" L.crypto_box_curve25519xsalsa20poly1305_messagebytes_max {# call pure unsafe crypto_box_curve25519xsalsa20poly1305_messagebytes_max #}
+  , z "crypto_box_curve25519xsalsa20poly1305_messagebytes_max" L.crypto_box_curve25519xsalsa20poly1305_messagebytes_max {# call pure unsafe crypto_box_curve25519xsalsa20poly1305_messagebytes_max #}
   , t "crypto_box_curve25519xsalsa20poly1305_noncebytes" L.crypto_box_curve25519xsalsa20poly1305_noncebytes {# call pure unsafe crypto_box_curve25519xsalsa20poly1305_noncebytes #}
   , t "crypto_box_curve25519xsalsa20poly1305_publickeybytes" L.crypto_box_curve25519xsalsa20poly1305_publickeybytes {# call pure unsafe crypto_box_curve25519xsalsa20poly1305_publickeybytes #}
   , t "crypto_box_curve25519xsalsa20poly1305_secretkeybytes" L.crypto_box_curve25519xsalsa20poly1305_secretkeybytes {# call pure unsafe crypto_box_curve25519xsalsa20poly1305_secretkeybytes #}
   , t "crypto_box_curve25519xsalsa20poly1305_seedbytes" L.crypto_box_curve25519xsalsa20poly1305_seedbytes {# call pure unsafe crypto_box_curve25519xsalsa20poly1305_seedbytes #}
   , t "crypto_box_curve25519xsalsa20poly1305_zerobytes" L.crypto_box_curve25519xsalsa20poly1305_zerobytes {# call pure unsafe crypto_box_curve25519xsalsa20poly1305_zerobytes #}
   , t "crypto_box_macbytes" L.crypto_box_macbytes {# call pure unsafe crypto_box_macbytes #}
-  , t "crypto_box_messagebytes_max" L.crypto_box_messagebytes_max {# call pure unsafe crypto_box_messagebytes_max #}
+  , z "crypto_box_messagebytes_max" L.crypto_box_messagebytes_max {# call pure unsafe crypto_box_messagebytes_max #}
   , t "crypto_box_noncebytes" L.crypto_box_noncebytes {# call pure unsafe crypto_box_noncebytes #}
   , t "crypto_box_publickeybytes" L.crypto_box_publickeybytes {# call pure unsafe crypto_box_publickeybytes #}
   , t "crypto_box_sealbytes" L.crypto_box_sealbytes {# call pure unsafe crypto_box_sealbytes #}
@@ -262,7 +302,7 @@ tt_constants_numbers = testGroup "numbers"
   , t "crypto_pwhash_argon2id_bytes_max" L.crypto_pwhash_argon2id_bytes_max {# call pure unsafe crypto_pwhash_argon2id_bytes_max #}
   , t "crypto_pwhash_argon2id_bytes_min" L.crypto_pwhash_argon2id_bytes_min {# call pure unsafe crypto_pwhash_argon2id_bytes_min #}
   , t "crypto_pwhash_argon2id_memlimit_interactive" L.crypto_pwhash_argon2id_memlimit_interactive {# call pure unsafe crypto_pwhash_argon2id_memlimit_interactive #}
-  , t "crypto_pwhash_argon2id_memlimit_max" L.crypto_pwhash_argon2id_memlimit_max {# call pure unsafe crypto_pwhash_argon2id_memlimit_max #}
+  , z "crypto_pwhash_argon2id_memlimit_max" L.crypto_pwhash_argon2id_memlimit_max {# call pure unsafe crypto_pwhash_argon2id_memlimit_max #}
   , t "crypto_pwhash_argon2id_memlimit_min" L.crypto_pwhash_argon2id_memlimit_min {# call pure unsafe crypto_pwhash_argon2id_memlimit_min #}
   , t "crypto_pwhash_argon2id_memlimit_moderate" L.crypto_pwhash_argon2id_memlimit_moderate {# call pure unsafe crypto_pwhash_argon2id_memlimit_moderate #}
   , t "crypto_pwhash_argon2id_memlimit_sensitive" L.crypto_pwhash_argon2id_memlimit_sensitive {# call pure unsafe crypto_pwhash_argon2id_memlimit_sensitive #}
@@ -276,7 +316,7 @@ tt_constants_numbers = testGroup "numbers"
   , t "crypto_pwhash_argon2id_saltbytes" L.crypto_pwhash_argon2id_saltbytes {# call pure unsafe crypto_pwhash_argon2id_saltbytes #}
   , t "crypto_pwhash_argon2id_strbytes" L.crypto_pwhash_argon2id_strbytes {# call pure unsafe crypto_pwhash_argon2id_strbytes #}
   , t "crypto_pwhash_argon2i_memlimit_interactive" L.crypto_pwhash_argon2i_memlimit_interactive {# call pure unsafe crypto_pwhash_argon2i_memlimit_interactive #}
-  , t "crypto_pwhash_argon2i_memlimit_max" L.crypto_pwhash_argon2i_memlimit_max {# call pure unsafe crypto_pwhash_argon2i_memlimit_max #}
+  , z "crypto_pwhash_argon2i_memlimit_max" L.crypto_pwhash_argon2i_memlimit_max {# call pure unsafe crypto_pwhash_argon2i_memlimit_max #}
   , t "crypto_pwhash_argon2i_memlimit_min" L.crypto_pwhash_argon2i_memlimit_min {# call pure unsafe crypto_pwhash_argon2i_memlimit_min #}
   , t "crypto_pwhash_argon2i_memlimit_moderate" L.crypto_pwhash_argon2i_memlimit_moderate {# call pure unsafe crypto_pwhash_argon2i_memlimit_moderate #}
   , t "crypto_pwhash_argon2i_memlimit_sensitive" L.crypto_pwhash_argon2i_memlimit_sensitive {# call pure unsafe crypto_pwhash_argon2i_memlimit_sensitive #}
@@ -292,7 +332,7 @@ tt_constants_numbers = testGroup "numbers"
   , t "crypto_pwhash_bytes_max" L.crypto_pwhash_bytes_max {# call pure unsafe crypto_pwhash_bytes_max #}
   , t "crypto_pwhash_bytes_min" L.crypto_pwhash_bytes_min {# call pure unsafe crypto_pwhash_bytes_min #}
   , t "crypto_pwhash_memlimit_interactive" L.crypto_pwhash_memlimit_interactive {# call pure unsafe crypto_pwhash_memlimit_interactive #}
-  , t "crypto_pwhash_memlimit_max" L.crypto_pwhash_memlimit_max {# call pure unsafe crypto_pwhash_memlimit_max #}
+  , z "crypto_pwhash_memlimit_max" L.crypto_pwhash_memlimit_max {# call pure unsafe crypto_pwhash_memlimit_max #}
   , t "crypto_pwhash_memlimit_min" L.crypto_pwhash_memlimit_min {# call pure unsafe crypto_pwhash_memlimit_min #}
   , t "crypto_pwhash_memlimit_moderate" L.crypto_pwhash_memlimit_moderate {# call pure unsafe crypto_pwhash_memlimit_moderate #}
   , t "crypto_pwhash_memlimit_sensitive" L.crypto_pwhash_memlimit_sensitive {# call pure unsafe crypto_pwhash_memlimit_sensitive #}
@@ -301,20 +341,20 @@ tt_constants_numbers = testGroup "numbers"
   , t "crypto_pwhash_opslimit_min" L.crypto_pwhash_opslimit_min {# call pure unsafe crypto_pwhash_opslimit_min #}
   , t "crypto_pwhash_opslimit_moderate" L.crypto_pwhash_opslimit_moderate {# call pure unsafe crypto_pwhash_opslimit_moderate #}
   , t "crypto_pwhash_opslimit_sensitive" L.crypto_pwhash_opslimit_sensitive {# call pure unsafe crypto_pwhash_opslimit_sensitive #}
-  , t "crypto_pwhash_passwd_max" L.crypto_pwhash_passwd_max {# call pure unsafe crypto_pwhash_passwd_max #}
+  , z "crypto_pwhash_passwd_max" L.crypto_pwhash_passwd_max {# call pure unsafe crypto_pwhash_passwd_max #}
   , t "crypto_pwhash_passwd_min" L.crypto_pwhash_passwd_min {# call pure unsafe crypto_pwhash_passwd_min #}
   , t "crypto_pwhash_saltbytes" L.crypto_pwhash_saltbytes {# call pure unsafe crypto_pwhash_saltbytes #}
-  , t "crypto_pwhash_scryptsalsa208sha256_bytes_max" L.crypto_pwhash_scryptsalsa208sha256_bytes_max {# call pure unsafe crypto_pwhash_scryptsalsa208sha256_bytes_max #}
+  , z "crypto_pwhash_scryptsalsa208sha256_bytes_max" L.crypto_pwhash_scryptsalsa208sha256_bytes_max {# call pure unsafe crypto_pwhash_scryptsalsa208sha256_bytes_max #}
   , t "crypto_pwhash_scryptsalsa208sha256_bytes_min" L.crypto_pwhash_scryptsalsa208sha256_bytes_min {# call pure unsafe crypto_pwhash_scryptsalsa208sha256_bytes_min #}
   , t "crypto_pwhash_scryptsalsa208sha256_memlimit_interactive" L.crypto_pwhash_scryptsalsa208sha256_memlimit_interactive {# call pure unsafe crypto_pwhash_scryptsalsa208sha256_memlimit_interactive #}
-  , t "crypto_pwhash_scryptsalsa208sha256_memlimit_max" L.crypto_pwhash_scryptsalsa208sha256_memlimit_max {# call pure unsafe crypto_pwhash_scryptsalsa208sha256_memlimit_max #}
+  , z "crypto_pwhash_scryptsalsa208sha256_memlimit_max" L.crypto_pwhash_scryptsalsa208sha256_memlimit_max {# call pure unsafe crypto_pwhash_scryptsalsa208sha256_memlimit_max #}
   , t "crypto_pwhash_scryptsalsa208sha256_memlimit_min" L.crypto_pwhash_scryptsalsa208sha256_memlimit_min {# call pure unsafe crypto_pwhash_scryptsalsa208sha256_memlimit_min #}
   , t "crypto_pwhash_scryptsalsa208sha256_memlimit_sensitive" L.crypto_pwhash_scryptsalsa208sha256_memlimit_sensitive {# call pure unsafe crypto_pwhash_scryptsalsa208sha256_memlimit_sensitive #}
   , t "crypto_pwhash_scryptsalsa208sha256_opslimit_interactive" L.crypto_pwhash_scryptsalsa208sha256_opslimit_interactive {# call pure unsafe crypto_pwhash_scryptsalsa208sha256_opslimit_interactive #}
   , t "crypto_pwhash_scryptsalsa208sha256_opslimit_max" L.crypto_pwhash_scryptsalsa208sha256_opslimit_max {# call pure unsafe crypto_pwhash_scryptsalsa208sha256_opslimit_max #}
   , t "crypto_pwhash_scryptsalsa208sha256_opslimit_min" L.crypto_pwhash_scryptsalsa208sha256_opslimit_min {# call pure unsafe crypto_pwhash_scryptsalsa208sha256_opslimit_min #}
   , t "crypto_pwhash_scryptsalsa208sha256_opslimit_sensitive" L.crypto_pwhash_scryptsalsa208sha256_opslimit_sensitive {# call pure unsafe crypto_pwhash_scryptsalsa208sha256_opslimit_sensitive #}
-  , t "crypto_pwhash_scryptsalsa208sha256_passwd_max" L.crypto_pwhash_scryptsalsa208sha256_passwd_max {# call pure unsafe crypto_pwhash_scryptsalsa208sha256_passwd_max #}
+  , z "crypto_pwhash_scryptsalsa208sha256_passwd_max" L.crypto_pwhash_scryptsalsa208sha256_passwd_max {# call pure unsafe crypto_pwhash_scryptsalsa208sha256_passwd_max #}
   , t "crypto_pwhash_scryptsalsa208sha256_passwd_min" L.crypto_pwhash_scryptsalsa208sha256_passwd_min {# call pure unsafe crypto_pwhash_scryptsalsa208sha256_passwd_min #}
   , t "crypto_pwhash_scryptsalsa208sha256_saltbytes" L.crypto_pwhash_scryptsalsa208sha256_saltbytes {# call pure unsafe crypto_pwhash_scryptsalsa208sha256_saltbytes #}
   , t "crypto_pwhash_scryptsalsa208sha256_strbytes" L.crypto_pwhash_scryptsalsa208sha256_strbytes {# call pure unsafe crypto_pwhash_scryptsalsa208sha256_strbytes #}
@@ -330,23 +370,23 @@ tt_constants_numbers = testGroup "numbers"
   , t "crypto_secretbox_boxzerobytes" L.crypto_secretbox_boxzerobytes {# call pure unsafe crypto_secretbox_boxzerobytes #}
   , t "crypto_secretbox_keybytes" L.crypto_secretbox_keybytes {# call pure unsafe crypto_secretbox_keybytes #}
   , t "crypto_secretbox_macbytes" L.crypto_secretbox_macbytes {# call pure unsafe crypto_secretbox_macbytes #}
-  , t "crypto_secretbox_messagebytes_max" L.crypto_secretbox_messagebytes_max {# call pure unsafe crypto_secretbox_messagebytes_max #}
+  , z "crypto_secretbox_messagebytes_max" L.crypto_secretbox_messagebytes_max {# call pure unsafe crypto_secretbox_messagebytes_max #}
   , t "crypto_secretbox_noncebytes" L.crypto_secretbox_noncebytes {# call pure unsafe crypto_secretbox_noncebytes #}
   , t "crypto_secretbox_xchacha20poly1305_keybytes" L.crypto_secretbox_xchacha20poly1305_keybytes {# call pure unsafe crypto_secretbox_xchacha20poly1305_keybytes #}
   , t "crypto_secretbox_xchacha20poly1305_macbytes" L.crypto_secretbox_xchacha20poly1305_macbytes {# call pure unsafe crypto_secretbox_xchacha20poly1305_macbytes #}
-  , t "crypto_secretbox_xchacha20poly1305_messagebytes_max" L.crypto_secretbox_xchacha20poly1305_messagebytes_max {# call pure unsafe crypto_secretbox_xchacha20poly1305_messagebytes_max #}
+  , z "crypto_secretbox_xchacha20poly1305_messagebytes_max" L.crypto_secretbox_xchacha20poly1305_messagebytes_max {# call pure unsafe crypto_secretbox_xchacha20poly1305_messagebytes_max #}
   , t "crypto_secretbox_xchacha20poly1305_noncebytes" L.crypto_secretbox_xchacha20poly1305_noncebytes {# call pure unsafe crypto_secretbox_xchacha20poly1305_noncebytes #}
   , t "crypto_secretbox_xsalsa20poly1305_boxzerobytes" L.crypto_secretbox_xsalsa20poly1305_boxzerobytes {# call pure unsafe crypto_secretbox_xsalsa20poly1305_boxzerobytes #}
   , t "crypto_secretbox_xsalsa20poly1305_keybytes" L.crypto_secretbox_xsalsa20poly1305_keybytes {# call pure unsafe crypto_secretbox_xsalsa20poly1305_keybytes #}
   , t "crypto_secretbox_xsalsa20poly1305_macbytes" L.crypto_secretbox_xsalsa20poly1305_macbytes {# call pure unsafe crypto_secretbox_xsalsa20poly1305_macbytes #}
-  , t "crypto_secretbox_xsalsa20poly1305_messagebytes_max" L.crypto_secretbox_xsalsa20poly1305_messagebytes_max {# call pure unsafe crypto_secretbox_xsalsa20poly1305_messagebytes_max #}
+  , z "crypto_secretbox_xsalsa20poly1305_messagebytes_max" L.crypto_secretbox_xsalsa20poly1305_messagebytes_max {# call pure unsafe crypto_secretbox_xsalsa20poly1305_messagebytes_max #}
   , t "crypto_secretbox_xsalsa20poly1305_noncebytes" L.crypto_secretbox_xsalsa20poly1305_noncebytes {# call pure unsafe crypto_secretbox_xsalsa20poly1305_noncebytes #}
   , t "crypto_secretbox_xsalsa20poly1305_zerobytes" L.crypto_secretbox_xsalsa20poly1305_zerobytes {# call pure unsafe crypto_secretbox_xsalsa20poly1305_zerobytes #}
   , t "crypto_secretbox_zerobytes" L.crypto_secretbox_zerobytes {# call pure unsafe crypto_secretbox_zerobytes #}
   , t "crypto_secretstream_xchacha20poly1305_abytes" L.crypto_secretstream_xchacha20poly1305_abytes {# call pure unsafe crypto_secretstream_xchacha20poly1305_abytes #}
   , t "crypto_secretstream_xchacha20poly1305_headerbytes" L.crypto_secretstream_xchacha20poly1305_headerbytes {# call pure unsafe crypto_secretstream_xchacha20poly1305_headerbytes #}
   , t "crypto_secretstream_xchacha20poly1305_keybytes" L.crypto_secretstream_xchacha20poly1305_keybytes {# call pure unsafe crypto_secretstream_xchacha20poly1305_keybytes #}
-  , t "crypto_secretstream_xchacha20poly1305_messagebytes_max" L.crypto_secretstream_xchacha20poly1305_messagebytes_max {# call pure unsafe crypto_secretstream_xchacha20poly1305_messagebytes_max #}
+  , z "crypto_secretstream_xchacha20poly1305_messagebytes_max" L.crypto_secretstream_xchacha20poly1305_messagebytes_max {# call pure unsafe crypto_secretstream_xchacha20poly1305_messagebytes_max #}
   , t "crypto_secretstream_xchacha20poly1305_statebytes" L.crypto_secretstream_xchacha20poly1305_statebytes {# call pure unsafe crypto_secretstream_xchacha20poly1305_statebytes #}
   , t "crypto_secretstream_xchacha20poly1305_tag_final" L.crypto_secretstream_xchacha20poly1305_tag_final {# call pure unsafe crypto_secretstream_xchacha20poly1305_tag_final #}
   , t "crypto_secretstream_xchacha20poly1305_tag_message" L.crypto_secretstream_xchacha20poly1305_tag_message {# call pure unsafe crypto_secretstream_xchacha20poly1305_tag_message #}
@@ -360,39 +400,39 @@ tt_constants_numbers = testGroup "numbers"
   , t "crypto_shorthash_siphashx24_keybytes" L.crypto_shorthash_siphashx24_keybytes {# call pure unsafe crypto_shorthash_siphashx24_keybytes #}
   , t "crypto_sign_bytes" L.crypto_sign_bytes {# call pure unsafe crypto_sign_bytes #}
   , t "crypto_sign_ed25519_bytes" L.crypto_sign_ed25519_bytes {# call pure unsafe crypto_sign_ed25519_bytes #}
-  , t "crypto_sign_ed25519_messagebytes_max" L.crypto_sign_ed25519_messagebytes_max {# call pure unsafe crypto_sign_ed25519_messagebytes_max #}
+  , z "crypto_sign_ed25519_messagebytes_max" L.crypto_sign_ed25519_messagebytes_max {# call pure unsafe crypto_sign_ed25519_messagebytes_max #}
   , t "crypto_sign_ed25519ph_statebytes" L.crypto_sign_ed25519ph_statebytes {# call pure unsafe crypto_sign_ed25519ph_statebytes #}
   , t "crypto_sign_ed25519_publickeybytes" L.crypto_sign_ed25519_publickeybytes {# call pure unsafe crypto_sign_ed25519_publickeybytes #}
   , t "crypto_sign_ed25519_secretkeybytes" L.crypto_sign_ed25519_secretkeybytes {# call pure unsafe crypto_sign_ed25519_secretkeybytes #}
   , t "crypto_sign_ed25519_seedbytes" L.crypto_sign_ed25519_seedbytes {# call pure unsafe crypto_sign_ed25519_seedbytes #}
-  , t "crypto_sign_messagebytes_max" L.crypto_sign_messagebytes_max {# call pure unsafe crypto_sign_messagebytes_max #}
+  , z "crypto_sign_messagebytes_max" L.crypto_sign_messagebytes_max {# call pure unsafe crypto_sign_messagebytes_max #}
   , t "crypto_sign_publickeybytes" L.crypto_sign_publickeybytes {# call pure unsafe crypto_sign_publickeybytes #}
   , t "crypto_sign_secretkeybytes" L.crypto_sign_secretkeybytes {# call pure unsafe crypto_sign_secretkeybytes #}
   , t "crypto_sign_seedbytes" L.crypto_sign_seedbytes {# call pure unsafe crypto_sign_seedbytes #}
   , t "crypto_sign_statebytes" L.crypto_sign_statebytes {# call pure unsafe crypto_sign_statebytes #}
   , t "crypto_stream_chacha20_ietf_keybytes" L.crypto_stream_chacha20_ietf_keybytes {# call pure unsafe crypto_stream_chacha20_ietf_keybytes #}
-  , t "crypto_stream_chacha20_ietf_messagebytes_max" L.crypto_stream_chacha20_ietf_messagebytes_max {# call pure unsafe crypto_stream_chacha20_ietf_messagebytes_max #}
+  , z "crypto_stream_chacha20_ietf_messagebytes_max" L.crypto_stream_chacha20_ietf_messagebytes_max {# call pure unsafe crypto_stream_chacha20_ietf_messagebytes_max #}
   , t "crypto_stream_chacha20_ietf_noncebytes" L.crypto_stream_chacha20_ietf_noncebytes {# call pure unsafe crypto_stream_chacha20_ietf_noncebytes #}
   , t "crypto_stream_chacha20_keybytes" L.crypto_stream_chacha20_keybytes {# call pure unsafe crypto_stream_chacha20_keybytes #}
-  , t "crypto_stream_chacha20_messagebytes_max" L.crypto_stream_chacha20_messagebytes_max {# call pure unsafe crypto_stream_chacha20_messagebytes_max #}
+  , z "crypto_stream_chacha20_messagebytes_max" L.crypto_stream_chacha20_messagebytes_max {# call pure unsafe crypto_stream_chacha20_messagebytes_max #}
   , t "crypto_stream_chacha20_noncebytes" L.crypto_stream_chacha20_noncebytes {# call pure unsafe crypto_stream_chacha20_noncebytes #}
   , t "crypto_stream_keybytes" L.crypto_stream_keybytes {# call pure unsafe crypto_stream_keybytes #}
-  , t "crypto_stream_messagebytes_max" L.crypto_stream_messagebytes_max {# call pure unsafe crypto_stream_messagebytes_max #}
+  , z "crypto_stream_messagebytes_max" L.crypto_stream_messagebytes_max {# call pure unsafe crypto_stream_messagebytes_max #}
   , t "crypto_stream_noncebytes" L.crypto_stream_noncebytes {# call pure unsafe crypto_stream_noncebytes #}
   , t "crypto_stream_salsa2012_keybytes" L.crypto_stream_salsa2012_keybytes {# call pure unsafe crypto_stream_salsa2012_keybytes #}
-  , t "crypto_stream_salsa2012_messagebytes_max" L.crypto_stream_salsa2012_messagebytes_max {# call pure unsafe crypto_stream_salsa2012_messagebytes_max #}
+  , z "crypto_stream_salsa2012_messagebytes_max" L.crypto_stream_salsa2012_messagebytes_max {# call pure unsafe crypto_stream_salsa2012_messagebytes_max #}
   , t "crypto_stream_salsa2012_noncebytes" L.crypto_stream_salsa2012_noncebytes {# call pure unsafe crypto_stream_salsa2012_noncebytes #}
   , t "crypto_stream_salsa208_keybytes" L.crypto_stream_salsa208_keybytes {# call pure unsafe crypto_stream_salsa208_keybytes #}
-  , t "crypto_stream_salsa208_messagebytes_max" L.crypto_stream_salsa208_messagebytes_max {# call pure unsafe crypto_stream_salsa208_messagebytes_max #}
+  , z "crypto_stream_salsa208_messagebytes_max" L.crypto_stream_salsa208_messagebytes_max {# call pure unsafe crypto_stream_salsa208_messagebytes_max #}
   , t "crypto_stream_salsa208_noncebytes" L.crypto_stream_salsa208_noncebytes {# call pure unsafe crypto_stream_salsa208_noncebytes #}
   , t "crypto_stream_salsa20_keybytes" L.crypto_stream_salsa20_keybytes {# call pure unsafe crypto_stream_salsa20_keybytes #}
-  , t "crypto_stream_salsa20_messagebytes_max" L.crypto_stream_salsa20_messagebytes_max {# call pure unsafe crypto_stream_salsa20_messagebytes_max #}
+  , z "crypto_stream_salsa20_messagebytes_max" L.crypto_stream_salsa20_messagebytes_max {# call pure unsafe crypto_stream_salsa20_messagebytes_max #}
   , t "crypto_stream_salsa20_noncebytes" L.crypto_stream_salsa20_noncebytes {# call pure unsafe crypto_stream_salsa20_noncebytes #}
   , t "crypto_stream_xchacha20_keybytes" L.crypto_stream_xchacha20_keybytes {# call pure unsafe crypto_stream_xchacha20_keybytes #}
-  , t "crypto_stream_xchacha20_messagebytes_max" L.crypto_stream_xchacha20_messagebytes_max {# call pure unsafe crypto_stream_xchacha20_messagebytes_max #}
+  , z "crypto_stream_xchacha20_messagebytes_max" L.crypto_stream_xchacha20_messagebytes_max {# call pure unsafe crypto_stream_xchacha20_messagebytes_max #}
   , t "crypto_stream_xchacha20_noncebytes" L.crypto_stream_xchacha20_noncebytes {# call pure unsafe crypto_stream_xchacha20_noncebytes #}
   , t "crypto_stream_xsalsa20_keybytes" L.crypto_stream_xsalsa20_keybytes {# call pure unsafe crypto_stream_xsalsa20_keybytes #}
-  , t "crypto_stream_xsalsa20_messagebytes_max" L.crypto_stream_xsalsa20_messagebytes_max {# call pure unsafe crypto_stream_xsalsa20_messagebytes_max #}
+  , z "crypto_stream_xsalsa20_messagebytes_max" L.crypto_stream_xsalsa20_messagebytes_max {# call pure unsafe crypto_stream_xsalsa20_messagebytes_max #}
   , t "crypto_stream_xsalsa20_noncebytes" L.crypto_stream_xsalsa20_noncebytes {# call pure unsafe crypto_stream_xsalsa20_noncebytes #}
   , t "crypto_verify_16_bytes" L.crypto_verify_16_bytes {# call pure unsafe crypto_verify_16_bytes #}
   , t "crypto_verify_32_bytes" L.crypto_verify_32_bytes {# call pure unsafe crypto_verify_32_bytes #}
@@ -401,9 +441,30 @@ tt_constants_numbers = testGroup "numbers"
   , t "sodium_library_minimal" L.sodium_library_minimal {# call pure unsafe sodium_library_minimal #}
   , t "sodium_library_version_major" L.sodium_library_version_major {# call pure unsafe sodium_library_version_major #}
   , t "sodium_library_version_minor" L.sodium_library_version_minor {# call pure unsafe sodium_library_version_minor #}
+#if (!defined(ghcjs_HOST_OS))
+  , t "crypto_aead_aes256gcm_abytes" L.crypto_aead_aes256gcm_abytes {# call pure unsafe crypto_aead_aes256gcm_abytes #}
+  , t "crypto_aead_aes256gcm_keybytes" L.crypto_aead_aes256gcm_keybytes {# call pure unsafe crypto_aead_aes256gcm_keybytes #}
+  , t "crypto_aead_aes256gcm_messagebytes_max" L.crypto_aead_aes256gcm_messagebytes_max {# call pure unsafe crypto_aead_aes256gcm_messagebytes_max #}
+  , t "crypto_aead_aes256gcm_npubbytes" L.crypto_aead_aes256gcm_npubbytes {# call pure unsafe crypto_aead_aes256gcm_npubbytes #}
+  , t "crypto_aead_aes256gcm_nsecbytes" L.crypto_aead_aes256gcm_nsecbytes {# call pure unsafe crypto_aead_aes256gcm_nsecbytes #}
+  , t "crypto_aead_aes256gcm_statebytes" L.crypto_aead_aes256gcm_statebytes {# call pure unsafe crypto_aead_aes256gcm_statebytes #}
+#endif
   ]
-  where t :: (Eq n, Show n, Num n) => String -> n -> n -> TestTree
-        t name expected actual = testCase name (expected @=? actual)
+  where
+    t :: (Eq n, Show n, Num n) => String -> n -> n -> TestTree
+    t name expected actual = testCase name (expected @=? actual)
+
+    -- Like 't', but behaves differently depending on whether we are on GHCJS or
+    -- LIBSODIUM_JS_COMPAT.
+    z :: (Ord n, Show n, Num n) => String -> n -> n -> TestTree
+    z name expected actual = testCase name $
+#if (defined(LIBSODIUM_JS_COMPAT) && !defined(ghcjs_HOST_OS))
+       assertBool (show expected <> " <= " <> show actual)
+                  (expected <= actual)
+#else
+       expected @=? actual
+#endif
+
 
 tt_constants_strings :: TestTree
 tt_constants_strings = testGroup "strings"
@@ -452,3 +513,41 @@ tt_randombytes = testGroup "randombytes.h"
       as /== bs
   ]
 
+-- | We test this function because it's one of the few using ArgPtrNull in GHCJS
+tt_hex2bin :: TestTree
+tt_hex2bin = testCase "hex2bin" $ do
+  let lout0 :: [CUChar] = [0x00, 0x10, 0xff, 0x00, 0x80]
+      lin :: [CChar] = map (fromIntegral. ord) "0010ff0080"
+  lout1 :: [CUChar] <- liftIO $
+    allocaArray (length lout0) $ \pout ->
+    allocaArray (length lin) $ \pin -> do
+      pokeArray pin lin
+      x <- L.sodium_hex2bin pout (fromIntegral (length lout0))
+                            pin (fromIntegral (length lin))
+                            nullPtr nullPtr nullPtr
+      0 @=? x
+      peekArray (length lout0) pout
+  lout0 @=? lout1
+
+-- | We test this function because it's one of the few using ArgI64 in GHCJS
+tt_hmacsha256 :: TestTree
+tt_hmacsha256 = testCase "hmacsha256" $ do
+  let msg :: [CUChar] = [0x10, 0x00, 0x89, 0xf2]
+      key :: [CUChar] = replicate keyLen 0x34
+      msgLen = length msg
+      keyLen = fromIntegral L.crypto_auth_hmacsha256_keybytes
+      outLen = fromIntegral L.crypto_auth_hmacsha256_bytes
+  out :: [CUChar] <-
+    allocaArray outLen $ \pout ->
+    allocaArray keyLen $ \pkey -> do
+    allocaArray msgLen $ \pmsg -> do
+      pokeArray pkey key
+      pokeArray pmsg msg
+      x <- L.crypto_auth_hmacsha256 pout pmsg (fromIntegral msgLen) pkey
+      0 @=? x
+      peekArray outLen pout
+  [131,63,27,98,211,34,32,56,232,86,253,133,170,39,93,47,27,
+   222,157,153,89,117,130,235,14,83,97,236,199,42,227,205] @=? out
+
+genChar8 :: MonadGen m => m Char
+genChar8 = Gen.enum '\x00' '\xff'

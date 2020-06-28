@@ -1,4 +1,42 @@
 {
+    "constraints": {
+        "sha256": "0rqmkcz2cdvg6821zs18ribvrvd8ggnw7z8w4lfrcfk4mq94iqs5",
+        "type": "tarball",
+        "url": "https://hackage.haskell.org/package/constraints-0.12/constraints-0.12.tar.gz",
+        "url_template": "https://hackage.haskell.org/package/constraints-<version>/constraints-<version>.tar.gz",
+        "version": "0.12"
+    },
+    "haskell-crypto": {
+        "branch": "master",
+        "description": "Haskell cryptography done right",
+        "homepage": "https://hackage.haskell.org/package/crypto-sodium",
+        "owner": "serokell",
+        "repo": "haskell-crypto",
+        "rev": "5f96c5f14dc022e9c242457a9a50425ce338a89e",
+        "sha256": "074sfhsn6qq0zc5rp6xnn534caq9wi5nsn3f7l29jphy02brw1ra",
+        "type": "tarball",
+        "url": "https://github.com/serokell/haskell-crypto/archive/5f96c5f14dc022e9c242457a9a50425ce338a89e.tar.gz",
+        "url_template": "https://github.com/<owner>/<repo>/archive/<rev>.tar.gz"
+    },
+    "hs-foreign-emscripten": {
+        "branch": "master",
+        "description": "INTERCEPT GHCJS CCALL DISPATCH TO EMSCRIPTEN",
+        "homepage": null,
+        "owner": "k0001",
+        "repo": "hs-foreign-emscripten",
+        "rev": "1d4d0b005d4ac83331a40b60b4c378266754ecd8",
+        "sha256": "1vdswl9v3hypn2q4ygw849abkfsxk9sc7brbdy8wpj2flpclz08y",
+        "type": "tarball",
+        "url": "https://github.com/k0001/hs-foreign-emscripten/archive/1d4d0b005d4ac83331a40b60b4c378266754ecd8.tar.gz",
+        "url_template": "https://github.com/<owner>/<repo>/archive/<rev>.tar.gz"
+    },
+    "lifted-async": {
+        "sha256": "0m9z976wwkwrqs0skcv3ns20px596jbva4wbm33ddh9zx04mj2ql",
+        "type": "tarball",
+        "url": "https://hackage.haskell.org/package/lifted-async-0.10.0.6/lifted-async-0.10.0.6.tar.gz",
+        "url_template": "https://hackage.haskell.org/package/lifted-async-<version>/lifted-async-<version>.tar.gz",
+        "version": "0.10.0.6"
+    },
     "niv": {
         "branch": "master",
         "description": "Easy dependency management for Nix projects",
