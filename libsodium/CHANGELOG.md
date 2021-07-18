@@ -1,3 +1,8 @@
+# Version 1.0.18.3
+
+* Add missing function: `sodium_free`.
+
+
 # Version 1.0.18.2
 
 * Add missing dependency on `c2hs`.

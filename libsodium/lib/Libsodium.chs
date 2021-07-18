@@ -306,6 +306,7 @@ module Libsodium {--}
   , sodium_bin2base64
   , sodium_bin2hex
   , sodium_compare
+  , sodium_free
   , sodium_hex2bin
   , sodium_increment
   , sodium_init
@@ -795,6 +796,7 @@ foreign import ccall unsafe "&randombytes_internal_implementation"
 {# fun sodium_hex2bin { id `bin ::: Ptr CUChar', id `bin_maxlen ::: CSize', id `hex ::: Ptr CChar', id `hex_len ::: CSize', id `ignore ::: Ptr CChar', id `bin_len ::: Ptr CSize', id `hex_end ::: Ptr  (Ptr CChar)' } -> `CInt' #}
 
 {# fun sodium_allocarray { id `count ::: CSize', id `size ::: CSize' } -> `Ptr a' castPtr #}
+{# fun sodium_free { castPtr `addr ::: Ptr x' } -> `()' #}
 {# fun sodium_malloc { id `size ::: CSize' } -> `Ptr a' castPtr #}
 {# fun sodium_memcmp { castPtr `b1 ::: Ptr a', castPtr `b2 ::: Ptr a', id `len ::: CSize' } -> `CInt' #}
 {# fun sodium_memzero { castPtr `pnt ::: Ptr x', id `len ::: CSize' } -> `()' #}
