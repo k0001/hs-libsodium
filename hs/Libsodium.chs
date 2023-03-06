@@ -337,38 +337,46 @@ module Libsodium {--}
     -- * Types
     --
     -- $types
-  , Crypto_aead_aes256gcm_state
+  , Crypto_aead_aes256gcm_state(..)
   , crypto_aead_aes256gcm_state'ptr
   , crypto_aead_aes256gcm_state'malloc
-  , Crypto_auth_hmacsha256_state
+  , Crypto_auth_hmacsha256_state(..)
   , crypto_auth_hmacsha256_state'ptr
   , crypto_auth_hmacsha256_state'malloc
   , Crypto_auth_hmacsha512256_state
-  , Crypto_auth_hmacsha512_state
+  , crypto_auth_hmacsha512256_state'ptr
+  , crypto_auth_hmacsha512256_state'malloc
+  , Crypto_auth_hmacsha512_state(..)
   , crypto_auth_hmacsha512_state'ptr
   , crypto_auth_hmacsha512_state'malloc
-  , Crypto_generichash_blake2b_state
+  , Crypto_generichash_blake2b_state(..)
   , crypto_generichash_blake2b_state'ptr
   , crypto_generichash_blake2b_state'malloc
   , Crypto_generichash_state
-  , Crypto_hash_sha256_state
+  , crypto_generichash_state'ptr
+  , crypto_generichash_state'malloc
+  , Crypto_hash_sha256_state(..)
   , crypto_hash_sha256_state'ptr
   , crypto_hash_sha256_state'malloc
-  , Crypto_hash_sha512_state
+  , Crypto_hash_sha512_state(..)
   , crypto_hash_sha512_state'ptr
   , crypto_hash_sha512_state'malloc
-  , Crypto_onetimeauth_poly1305_state
+  , Crypto_onetimeauth_poly1305_state(..)
   , crypto_onetimeauth_poly1305_state'ptr
   , crypto_onetimeauth_poly1305_state'malloc
   , Crypto_onetimeauth_state
-  , Crypto_secretstream_xchacha20poly1305_state
+  , crypto_onetimeauth_state'ptr
+  , crypto_onetimeauth_state'malloc
+  , Crypto_secretstream_xchacha20poly1305_state(..)
   , crypto_secretstream_xchacha20poly1305_state'ptr
   , crypto_secretstream_xchacha20poly1305_state'malloc
-  , Crypto_sign_ed25519ph_state
+  , Crypto_sign_ed25519ph_state(..)
   , crypto_sign_ed25519ph_state'ptr
   , crypto_sign_ed25519ph_state'malloc
   , Crypto_sign_state
-  , Randombytes_implementation
+  , crypto_sign_state'ptr
+  , crypto_sign_state'malloc
+  , Randombytes_implementation(..)
   , randombytes_implementation'ptr
   , randombytes_implementation'malloc
   -- * Constants
@@ -379,14 +387,12 @@ module Libsodium {--}
   where
 
 import Data.Coerce
-import Data.Proxy
 import Data.Word
 import Foreign.C
 import Foreign.ForeignPtr
 import Foreign.Marshal.Array (copyArray)
 import Foreign.Ptr
 import Foreign.Storable
-import GHC.TypeLits
 import Libsodium.Constants
 
 -------------------------------------------------------------------------
@@ -811,146 +817,403 @@ foreign import ccall unsafe "&randombytes_internal_implementation"
 -- $types
 --
 -- These are types used by some of the functions in "Libsodium".
--- They are exported as opaque types having a particular size and
+--
+-- * They are exported as opaque types having a particular size and
 -- alignment described by their 'Storable' instance.
 --
--- Use the @/xxx/'malloc@ functions to allocate values of type @Xxx@. These
--- will be freed from memory as soon as they become unused.
+-- * Use the @/xxx/'malloc@ functions to allocate values of type @Xxx@. These
+-- will be zeroed using 'sodium_memzero' and released once they become
+-- unreachable.
 --
--- Use the @/xxx/'ptr@ function to obtain a
--- @'Ptr' Xxx@ suitable for passing to functions.
+-- * @/Xxx/@s obtained through 'peek' (from 'Storable') use the @/xxx/'malloc@
+-- allocation and self-cleaning approach, too.
+--
+-- * Use the @/xxx/'ptr@ function to obtain a @'Ptr' Xxx@ suitable for passing
+-- to functions in this module.
+--
+-- * The constructors of these types are exported in case you want to obtain
+-- the underlying 'ForeignPtr' by means other than @/xxx/'malloc@.
+
 newtype Crypto_aead_aes256gcm_state
   = Crypto_aead_aes256gcm_state
-    (Opaque 16 {# sizeof crypto_aead_aes256gcm_state #})
-  deriving newtype (Storable)
+    (ForeignPtr Crypto_aead_aes256gcm_state)
+
+instance Storable Crypto_aead_aes256gcm_state where
+  sizeOf _ = {# sizeof crypto_aead_aes256gcm_state #}
+  alignment _ = {# alignof crypto_aead_aes256gcm_state #}
+  poke pd s = crypto_aead_aes256gcm_state'ptr s $ \ps ->
+    copyArray pd ps 1
+  peek ps = do
+    d <- crypto_aead_aes256gcm_state'malloc
+    crypto_aead_aes256gcm_state'ptr d $ \pd -> copyArray pd ps 1
+    pure d
 
 crypto_aead_aes256gcm_state'malloc
   :: IO Crypto_aead_aes256gcm_state
-crypto_aead_aes256gcm_state'malloc =
-  fmap Crypto_aead_aes256gcm_state opaque'malloc
+crypto_aead_aes256gcm_state'malloc = do
+  fp <- mallocForeignPtr
+  addForeignPtrFinalizer finalizer_crypto_aead_aes256gcm_state fp
+  pure (Crypto_aead_aes256gcm_state fp)
 
 crypto_aead_aes256gcm_state'ptr
   :: Crypto_aead_aes256gcm_state
   -> (Ptr Crypto_aead_aes256gcm_state -> IO x)
   -> IO x
-crypto_aead_aes256gcm_state'ptr = opaque'ptr
-       @Crypto_aead_aes256gcm_state
+crypto_aead_aes256gcm_state'ptr t g = withForeignPtr (coerce t) g
+
+foreign import ccall unsafe
+  "hs_libsodium.h &hs_libsodium_finalizer_crypto_aead_aes256gcm_state"
+  finalizer_crypto_aead_aes256gcm_state
+    :: FinalizerPtr Crypto_aead_aes256gcm_state
 
 ---
+
+-- | Type-synonym for 'Crypto_sign_ed25519ph_state'
 type Crypto_sign_state = Crypto_sign_ed25519ph_state
 
-newtype Crypto_sign_ed25519ph_state = Crypto_sign_ed25519ph_state
-  (Opaque {# alignof crypto_sign_ed25519ph_state #}
-          {# sizeof crypto_sign_ed25519ph_state #})
-  deriving newtype (Storable)
+-- | Same as 'crypto_sign_ed25519ph_state'malloc'.
+crypto_sign_state'malloc :: IO Crypto_sign_state
+crypto_sign_state'malloc = crypto_sign_ed25519ph_state'malloc
 
-crypto_sign_ed25519ph_state'ptr = opaque'ptr @Crypto_sign_ed25519ph_state
-crypto_sign_ed25519ph_state'malloc = fmap Crypto_sign_ed25519ph_state opaque'malloc
+-- | Same as 'crypto_sign_ed25519ph_state'ptr'.
+crypto_sign_state'ptr
+  :: Crypto_sign_state
+  -> (Ptr Crypto_sign_state -> IO x)
+  -> IO x
+crypto_sign_state'ptr = crypto_sign_ed25519ph_state'ptr
 
 ---
+
+newtype Crypto_sign_ed25519ph_state
+  = Crypto_sign_ed25519ph_state
+    (ForeignPtr Crypto_sign_ed25519ph_state)
+
+instance Storable Crypto_sign_ed25519ph_state where
+  sizeOf _ = {# sizeof crypto_sign_ed25519ph_state #}
+  alignment _ = {# alignof crypto_sign_ed25519ph_state #}
+  poke pd s = crypto_sign_ed25519ph_state'ptr s $ \ps ->
+    copyArray pd ps 1
+  peek ps = do
+    d <- crypto_sign_ed25519ph_state'malloc
+    crypto_sign_ed25519ph_state'ptr d $ \pd -> copyArray pd ps 1
+    pure d
+
+crypto_sign_ed25519ph_state'malloc
+  :: IO Crypto_sign_ed25519ph_state
+crypto_sign_ed25519ph_state'malloc = do
+  fp <- mallocForeignPtr
+  addForeignPtrFinalizer finalizer_crypto_sign_ed25519ph_state fp
+  pure (Crypto_sign_ed25519ph_state fp)
+
+crypto_sign_ed25519ph_state'ptr
+  :: Crypto_sign_ed25519ph_state
+  -> (Ptr Crypto_sign_ed25519ph_state -> IO x)
+  -> IO x
+crypto_sign_ed25519ph_state'ptr t g = withForeignPtr (coerce t) g
+
+foreign import ccall unsafe
+  "hs_libsodium.h &hs_libsodium_finalizer_crypto_sign_ed25519ph_state"
+  finalizer_crypto_sign_ed25519ph_state
+    :: FinalizerPtr Crypto_sign_ed25519ph_state
+
+---
+
 newtype Crypto_secretstream_xchacha20poly1305_state
   = Crypto_secretstream_xchacha20poly1305_state
-  (Opaque {# alignof crypto_secretstream_xchacha20poly1305_state #}
-          {# sizeof crypto_secretstream_xchacha20poly1305_state #})
-  deriving newtype (Storable)
+    (ForeignPtr Crypto_secretstream_xchacha20poly1305_state)
 
-crypto_secretstream_xchacha20poly1305_state'ptr = opaque'ptr @Crypto_secretstream_xchacha20poly1305_state
-crypto_secretstream_xchacha20poly1305_state'malloc = fmap Crypto_secretstream_xchacha20poly1305_state opaque'malloc
+instance Storable Crypto_secretstream_xchacha20poly1305_state where
+  sizeOf _ = {# sizeof crypto_secretstream_xchacha20poly1305_state #}
+  alignment _ = {# alignof crypto_secretstream_xchacha20poly1305_state #}
+  poke pd s = crypto_secretstream_xchacha20poly1305_state'ptr s $ \ps ->
+    copyArray pd ps 1
+  peek ps = do
+    d <- crypto_secretstream_xchacha20poly1305_state'malloc
+    crypto_secretstream_xchacha20poly1305_state'ptr d $ \pd -> copyArray pd ps 1
+    pure d
+
+crypto_secretstream_xchacha20poly1305_state'malloc
+  :: IO Crypto_secretstream_xchacha20poly1305_state
+crypto_secretstream_xchacha20poly1305_state'malloc = do
+  fp <- mallocForeignPtr
+  addForeignPtrFinalizer finalizer_crypto_secretstream_xchacha20poly1305_state fp
+  pure (Crypto_secretstream_xchacha20poly1305_state fp)
+
+crypto_secretstream_xchacha20poly1305_state'ptr
+  :: Crypto_secretstream_xchacha20poly1305_state
+  -> (Ptr Crypto_secretstream_xchacha20poly1305_state -> IO x)
+  -> IO x
+crypto_secretstream_xchacha20poly1305_state'ptr t g = withForeignPtr (coerce t) g
+
+foreign import ccall unsafe
+  "hs_libsodium.h &hs_libsodium_finalizer_crypto_secretstream_xchacha20poly1305_state"
+  finalizer_crypto_secretstream_xchacha20poly1305_state
+    :: FinalizerPtr Crypto_secretstream_xchacha20poly1305_state
 
 ---
+
+-- | Type-synonym for 'Crypto_onetimeauth_poly1305_state'
 type Crypto_onetimeauth_state = Crypto_onetimeauth_poly1305_state
 
-newtype Crypto_onetimeauth_poly1305_state = Crypto_onetimeauth_poly1305_state
-  (Opaque 16 {# sizeof crypto_onetimeauth_poly1305_state #})
-  deriving newtype (Storable)
+-- | Same as 'crypto_onetimeauth_poly1305_state'malloc'.
+crypto_onetimeauth_state'malloc :: IO Crypto_onetimeauth_state
+crypto_onetimeauth_state'malloc = crypto_onetimeauth_poly1305_state'malloc
 
-crypto_onetimeauth_poly1305_state'ptr = opaque'ptr @Crypto_onetimeauth_poly1305_state
-crypto_onetimeauth_poly1305_state'malloc = fmap Crypto_onetimeauth_poly1305_state opaque'malloc
+-- | Same as 'crypto_onetimeauth_poly1305_state'ptr'.
+crypto_onetimeauth_state'ptr
+  :: Crypto_onetimeauth_state
+  -> (Ptr Crypto_onetimeauth_state -> IO x)
+  -> IO x
+crypto_onetimeauth_state'ptr = crypto_onetimeauth_poly1305_state'ptr
 
 ---
+
+newtype Crypto_onetimeauth_poly1305_state
+  = Crypto_onetimeauth_poly1305_state
+    (ForeignPtr Crypto_onetimeauth_poly1305_state)
+
+instance Storable Crypto_onetimeauth_poly1305_state where
+  sizeOf _ = {# sizeof crypto_onetimeauth_poly1305_state #}
+  alignment _ = {# alignof crypto_onetimeauth_poly1305_state #}
+  poke pd s = crypto_onetimeauth_poly1305_state'ptr s $ \ps ->
+    copyArray pd ps 1
+  peek ps = do
+    d <- crypto_onetimeauth_poly1305_state'malloc
+    crypto_onetimeauth_poly1305_state'ptr d $ \pd -> copyArray pd ps 1
+    pure d
+
+crypto_onetimeauth_poly1305_state'malloc
+  :: IO Crypto_onetimeauth_poly1305_state
+crypto_onetimeauth_poly1305_state'malloc = do
+  fp <- mallocForeignPtr
+  addForeignPtrFinalizer finalizer_crypto_onetimeauth_poly1305_state fp
+  pure (Crypto_onetimeauth_poly1305_state fp)
+
+crypto_onetimeauth_poly1305_state'ptr
+  :: Crypto_onetimeauth_poly1305_state
+  -> (Ptr Crypto_onetimeauth_poly1305_state -> IO x)
+  -> IO x
+crypto_onetimeauth_poly1305_state'ptr t g = withForeignPtr (coerce t) g
+
+foreign import ccall unsafe
+  "hs_libsodium.h &hs_libsodium_finalizer_crypto_onetimeauth_poly1305_state"
+  finalizer_crypto_onetimeauth_poly1305_state
+    :: FinalizerPtr Crypto_onetimeauth_poly1305_state
+
+---
+
+-- | Type-synonym for 'Crypto_generichash_blake2b_state'
 type Crypto_generichash_state = Crypto_generichash_blake2b_state
 
-newtype Crypto_generichash_blake2b_state = Crypto_generichash_blake2b_state
-  (Opaque 64 {# sizeof crypto_generichash_blake2b_state #})
-  deriving newtype (Storable)
+-- | Same as 'crypto_generichash_blake2b_state'malloc'.
+crypto_generichash_state'malloc :: IO Crypto_generichash_state
+crypto_generichash_state'malloc = crypto_generichash_blake2b_state'malloc
 
-crypto_generichash_blake2b_state'ptr = opaque'ptr @Crypto_generichash_blake2b_state
-crypto_generichash_blake2b_state'malloc = fmap Crypto_generichash_blake2b_state opaque'malloc
-
----
-newtype Crypto_hash_sha256_state = Crypto_hash_sha256_state
-  (Opaque {# alignof crypto_hash_sha256_state #}
-          {# sizeof crypto_hash_sha256_state #})
-  deriving newtype (Storable)
-
-crypto_hash_sha256_state'ptr = opaque'ptr @Crypto_hash_sha256_state
-crypto_hash_sha256_state'malloc = fmap Crypto_hash_sha256_state opaque'malloc
+-- | Same as 'crypto_generichash_blake2b_state'ptr'.
+crypto_generichash_state'ptr
+  :: Crypto_generichash_state
+  -> (Ptr Crypto_generichash_state -> IO x)
+  -> IO x
+crypto_generichash_state'ptr = crypto_generichash_blake2b_state'ptr
 
 ---
-newtype Crypto_hash_sha512_state = Crypto_hash_sha512_state
-  (Opaque {# alignof crypto_hash_sha512_state #}
-          {# sizeof crypto_hash_sha512_state #})
-  deriving newtype (Storable)
 
-crypto_hash_sha512_state'ptr = opaque'ptr @Crypto_hash_sha512_state
-crypto_hash_sha512_state'malloc = fmap Crypto_hash_sha512_state opaque'malloc
+newtype Crypto_generichash_blake2b_state
+  = Crypto_generichash_blake2b_state
+    (ForeignPtr Crypto_generichash_blake2b_state)
+
+instance Storable Crypto_generichash_blake2b_state where
+  sizeOf _ = {# sizeof crypto_generichash_blake2b_state #}
+  alignment _ = {# alignof crypto_generichash_blake2b_state #}
+  poke pd s = crypto_generichash_blake2b_state'ptr s $ \ps ->
+    copyArray pd ps 1
+  peek ps = do
+    d <- crypto_generichash_blake2b_state'malloc
+    crypto_generichash_blake2b_state'ptr d $ \pd -> copyArray pd ps 1
+    pure d
+
+crypto_generichash_blake2b_state'malloc :: IO Crypto_generichash_blake2b_state
+crypto_generichash_blake2b_state'malloc = do
+  fp <- mallocForeignPtr
+  addForeignPtrFinalizer finalizer_crypto_generichash_blake2b_state fp
+  pure (Crypto_generichash_blake2b_state fp)
+
+crypto_generichash_blake2b_state'ptr
+  :: Crypto_generichash_blake2b_state
+  -> (Ptr Crypto_generichash_blake2b_state -> IO x)
+  -> IO x
+crypto_generichash_blake2b_state'ptr t g = withForeignPtr (coerce t) g
+
+foreign import ccall unsafe
+  "hs_libsodium.h &hs_libsodium_finalizer_crypto_generichash_blake2b_state"
+  finalizer_crypto_generichash_blake2b_state
+    :: FinalizerPtr Crypto_generichash_blake2b_state
 
 ---
+
+newtype Crypto_hash_sha256_state
+  = Crypto_hash_sha256_state (ForeignPtr Crypto_hash_sha256_state)
+
+instance Storable Crypto_hash_sha256_state where
+  sizeOf _ = {# sizeof crypto_hash_sha256_state #}
+  alignment _ = {# alignof crypto_hash_sha256_state #}
+  poke pd s = crypto_hash_sha256_state'ptr s $ \ps -> copyArray pd ps 1
+  peek ps = do d <- crypto_hash_sha256_state'malloc
+               crypto_hash_sha256_state'ptr d $ \pd -> copyArray pd ps 1
+               pure d
+
+crypto_hash_sha256_state'malloc :: IO Crypto_hash_sha256_state
+crypto_hash_sha256_state'malloc = do
+  fp <- mallocForeignPtr
+  addForeignPtrFinalizer finalizer_crypto_hash_sha256_state fp
+  pure (Crypto_hash_sha256_state fp)
+
+crypto_hash_sha256_state'ptr
+  :: Crypto_hash_sha256_state
+  -> (Ptr Crypto_hash_sha256_state -> IO x)
+  -> IO x
+crypto_hash_sha256_state'ptr t g = withForeignPtr (coerce t) g
+
+foreign import ccall unsafe
+  "hs_libsodium.h &hs_libsodium_finalizer_crypto_hash_sha256_state"
+  finalizer_crypto_hash_sha256_state
+    :: FinalizerPtr Crypto_hash_sha256_state
+
+---
+
+newtype Crypto_hash_sha512_state
+  = Crypto_hash_sha512_state (ForeignPtr Crypto_hash_sha512_state)
+
+instance Storable Crypto_hash_sha512_state where
+  sizeOf _ = {# sizeof crypto_hash_sha512_state #}
+  alignment _ = {# alignof crypto_hash_sha512_state #}
+  poke pd s = crypto_hash_sha512_state'ptr s $ \ps -> copyArray pd ps 1
+  peek ps = do d <- crypto_hash_sha512_state'malloc
+               crypto_hash_sha512_state'ptr d $ \pd -> copyArray pd ps 1
+               pure d
+
+crypto_hash_sha512_state'malloc :: IO Crypto_hash_sha512_state
+crypto_hash_sha512_state'malloc = do
+  fp <- mallocForeignPtr
+  addForeignPtrFinalizer finalizer_crypto_hash_sha512_state fp
+  pure (Crypto_hash_sha512_state fp)
+
+crypto_hash_sha512_state'ptr
+  :: Crypto_hash_sha512_state
+  -> (Ptr Crypto_hash_sha512_state -> IO x)
+  -> IO x
+crypto_hash_sha512_state'ptr t g = withForeignPtr (coerce t) g
+
+foreign import ccall unsafe
+  "hs_libsodium.h &hs_libsodium_finalizer_crypto_hash_sha512_state"
+  finalizer_crypto_hash_sha512_state
+    :: FinalizerPtr Crypto_hash_sha512_state
+
+---
+
+-- |Type synonym for 'Crypto_auth_hmacsha512_state'.
 type Crypto_auth_hmacsha512256_state = Crypto_auth_hmacsha512_state
 
-newtype Crypto_auth_hmacsha512_state = Crypto_auth_hmacsha512_state
-  (Opaque {# alignof crypto_auth_hmacsha512_state #}
-          {# sizeof crypto_auth_hmacsha512_state #})
-  deriving newtype (Storable)
+-- | Same as 'crypto_auth_hmacsha512_state'malloc'.
+crypto_auth_hmacsha512256_state'malloc :: IO Crypto_auth_hmacsha512256_state
+crypto_auth_hmacsha512256_state'malloc = crypto_auth_hmacsha512_state'malloc
 
-crypto_auth_hmacsha512_state'ptr = opaque'ptr @Crypto_auth_hmacsha512_state
-crypto_auth_hmacsha512_state'malloc = fmap Crypto_auth_hmacsha512_state opaque'malloc
-
----
-newtype Crypto_auth_hmacsha256_state = Crypto_auth_hmacsha256_state
-  (Opaque {# alignof crypto_auth_hmacsha256_state #}
-          {# sizeof crypto_auth_hmacsha256_state #})
-  deriving newtype (Storable)
-
-crypto_auth_hmacsha256_state'ptr = opaque'ptr @Crypto_auth_hmacsha256_state
-crypto_auth_hmacsha256_state'malloc = fmap Crypto_auth_hmacsha256_state opaque'malloc
-
----
-newtype Randombytes_implementation = Randombytes_implementation
-  (Opaque {# alignof randombytes_implementation #}
-          {# sizeof randombytes_implementation #})
-  deriving newtype (Storable)
-
-randombytes_implementation'ptr = opaque'ptr @Randombytes_implementation
-randombytes_implementation'malloc = fmap Randombytes_implementation opaque'malloc
-
---------------------------------------------------------------------------------
-
-newtype Opaque (alignment :: Nat) (size :: Nat)
-  = Opaque (ForeignPtr (Opaque alignment size))
-
-instance forall a s. (KnownNat a, KnownNat s) => Storable (Opaque a s) where
-  alignment _ = fromIntegral (natVal (Proxy :: Proxy a))
-  sizeOf _ = fromIntegral (natVal (Proxy :: Proxy s))
-  peek ps = do
-    fpd <- mallocForeignPtr
-    withForeignPtr fpd $ \pd -> copyArray pd ps 1
-    pure $ Opaque fpd
-  poke pd (Opaque fps) =
-    withForeignPtr fps $ \ps -> copyArray pd ps 1
-
-opaque'malloc :: (KnownNat a, KnownNat s) => IO (Opaque a s)
-opaque'malloc = fmap Opaque mallocForeignPtr
-
-opaque'ptr
-  :: forall o a s x
-  .  Coercible o (Opaque a s)
-  => o
-  -> (Ptr o -> IO x)
+-- | Same as 'crypto_auth_hmacsha512_state'ptr'.
+crypto_auth_hmacsha512256_state'ptr
+  :: Crypto_auth_hmacsha512256_state
+  -> (Ptr Crypto_auth_hmacsha512256_state -> IO x)
   -> IO x
-opaque'ptr o g =
-  let Opaque fp = coerce o :: Opaque a s
-  in withForeignPtr fp (g . castPtr)
+crypto_auth_hmacsha512256_state'ptr = crypto_auth_hmacsha512_state'ptr
+
+---
+
+newtype Crypto_auth_hmacsha512_state
+  = Crypto_auth_hmacsha512_state (ForeignPtr Crypto_auth_hmacsha512_state)
+
+instance Storable Crypto_auth_hmacsha512_state where
+  sizeOf _ = {# sizeof crypto_auth_hmacsha512_state #}
+  alignment _ = {# alignof crypto_auth_hmacsha512_state #}
+  poke pd s = crypto_auth_hmacsha512_state'ptr s $ \ps -> copyArray pd ps 1
+  peek ps = do d <- crypto_auth_hmacsha512_state'malloc
+               crypto_auth_hmacsha512_state'ptr d $ \pd -> copyArray pd ps 1
+               pure d
+
+crypto_auth_hmacsha512_state'malloc :: IO Crypto_auth_hmacsha512_state
+crypto_auth_hmacsha512_state'malloc = do
+  fp <- mallocForeignPtr
+  addForeignPtrFinalizer finalizer_crypto_auth_hmacsha512_state fp
+  pure (Crypto_auth_hmacsha512_state fp)
+
+crypto_auth_hmacsha512_state'ptr
+  :: Crypto_auth_hmacsha512_state
+  -> (Ptr Crypto_auth_hmacsha512_state -> IO x)
+  -> IO x
+crypto_auth_hmacsha512_state'ptr t g = withForeignPtr (coerce t) g
+
+foreign import ccall unsafe
+  "hs_libsodium.h &hs_libsodium_finalizer_crypto_auth_hmacsha512_state"
+  finalizer_crypto_auth_hmacsha512_state
+    :: FinalizerPtr Crypto_auth_hmacsha512_state
+
+---
+
+newtype Crypto_auth_hmacsha256_state
+  = Crypto_auth_hmacsha256_state (ForeignPtr Crypto_auth_hmacsha256_state)
+
+instance Storable Crypto_auth_hmacsha256_state where
+  sizeOf _ = {# sizeof crypto_auth_hmacsha256_state #}
+  alignment _ = {# alignof crypto_auth_hmacsha256_state #}
+  poke pd s = crypto_auth_hmacsha256_state'ptr s $ \ps -> copyArray pd ps 1
+  peek ps = do d <- crypto_auth_hmacsha256_state'malloc
+               crypto_auth_hmacsha256_state'ptr d $ \pd -> copyArray pd ps 1
+               pure d
+
+crypto_auth_hmacsha256_state'malloc :: IO Crypto_auth_hmacsha256_state
+crypto_auth_hmacsha256_state'malloc = do
+  fp <- mallocForeignPtr
+  addForeignPtrFinalizer finalizer_crypto_auth_hmacsha256_state fp
+  pure (Crypto_auth_hmacsha256_state fp)
+
+crypto_auth_hmacsha256_state'ptr
+  :: Crypto_auth_hmacsha256_state
+  -> (Ptr Crypto_auth_hmacsha256_state -> IO x)
+  -> IO x
+crypto_auth_hmacsha256_state'ptr t g = withForeignPtr (coerce t) g
+
+foreign import ccall unsafe
+  "hs_libsodium.h &hs_libsodium_finalizer_crypto_auth_hmacsha256_state"
+  finalizer_crypto_auth_hmacsha256_state
+    :: FinalizerPtr Crypto_auth_hmacsha256_state
+
+---
+
+newtype Randombytes_implementation
+  = Randombytes_implementation (ForeignPtr Randombytes_implementation)
+
+instance Storable Randombytes_implementation where
+  sizeOf _ = {# sizeof randombytes_implementation #}
+  alignment _ = {# alignof randombytes_implementation #}
+  poke pd s = randombytes_implementation'ptr s $ \ps -> copyArray pd ps 1
+  peek ps = do d <- randombytes_implementation'malloc
+               randombytes_implementation'ptr d $ \pd -> copyArray pd ps 1
+               pure d
+
+randombytes_implementation'malloc :: IO Randombytes_implementation
+randombytes_implementation'malloc = do
+  fp <- mallocForeignPtr
+  addForeignPtrFinalizer finalizer_randombytes_implementation fp
+  pure (Randombytes_implementation fp)
+
+randombytes_implementation'ptr
+  :: Randombytes_implementation
+  -> (Ptr Randombytes_implementation -> IO x)
+  -> IO x
+randombytes_implementation'ptr t g = withForeignPtr (coerce t) g
+
+foreign import ccall unsafe
+  "hs_libsodium.h &hs_libsodium_finalizer_randombytes_implementation"
+  finalizer_randombytes_implementation
+    :: FinalizerPtr Randombytes_implementation
 
 --------------------------------------------------------------------------------
 -- $constants

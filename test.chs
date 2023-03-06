@@ -1,19 +1,22 @@
-{-# LANGUAGE BangPatterns #-}
-{-# LANGUAGE ScopedTypeVariables #-}
 #include <sodium.h>
 
 module Main (main) where
 
 import Control.Monad
 import Control.Monad.IO.Class
+import Data.Coerce
+import Data.Word
+import Data.Function (fix)
 import Foreign.C.String
 import Foreign.C.Types
+import Foreign.Ptr
 import Foreign.ForeignPtr
 import Foreign.Storable
 import qualified Test.Tasty as Tasty
 import qualified Test.Tasty.Runners as Tasty
 import Test.Tasty (TestTree, testGroup)
-import Test.Tasty.HUnit (testCase, (@=?), (@?))
+import Test.Tasty.HUnit (Assertion, HasCallStack, assertFailure,
+  testCase, (@=?), (@?))
 import Test.Tasty.Hedgehog (testProperty)
 import Hedgehog (property, forAll, (/==), diff)
 import qualified Hedgehog.Gen as Gen
@@ -72,40 +75,107 @@ tt_libsodium = testGroup "libsodium"
   [ tt_core
   , tt_constants
   , tt_randombytes
-  , tt_storable
+  , tt_memory
   ]
 
-tt_storable :: TestTree
-tt_storable = testGroup "Storable"
-  [ testCase "alloc" $ do
-      _ :: ForeignPtr L.Crypto_hash_sha256_state <- mallocForeignPtr
-      pure ()
 
-  , testCase "peek" $ do
-      -- Allocate s1 and fill with random bytes
-      s1 <- L.crypto_hash_sha256_state'malloc
-      L.crypto_hash_sha256_state'ptr s1 $ \p1 -> do
-        L.randombytes_buf p1 (fromIntegral (sizeOf s1))
-        -- Allocate s2 by peeking from s1
-        s2 <- peek p1
-        L.crypto_hash_sha256_state'ptr s2 $ \p2 -> do
-          -- Compare s1 and s2
-          x <- L.sodium_memcmp p1 p2 (fromIntegral (sizeOf s1))
-          0 @=? x
 
-  , testCase "poke" $ do
-      -- Allocate s1 and fill with random bytes
-      s1 <- L.crypto_hash_sha256_state'malloc
-      L.crypto_hash_sha256_state'ptr s1 $ \p1 -> do
-        L.randombytes_buf p1 (fromIntegral (sizeOf s1))
-        -- Allocate s2 and poke s1 into it
-        s2 <- L.crypto_hash_sha256_state'malloc
-        L.crypto_hash_sha256_state'ptr s2 $ \p2 -> do
-          poke p2 s1
-          -- Compare s1 and s2
-          x <- L.sodium_memcmp p1 p2 (fromIntegral (sizeOf s1))
-          0 @=? x
-  ]
+tt_memory :: TestTree
+tt_memory = testGroup "Memory"
+    [ f "crypto_hash_sha256_state"
+       L.crypto_hash_sha256_state'malloc
+    , f "crypto_aead_aes256gcm_state"
+       L.crypto_aead_aes256gcm_state'malloc
+    , f "crypto_auth_hmacsha256_state"
+       L.crypto_auth_hmacsha256_state'malloc
+    , f "crypto_auth_hmacsha512256_state"
+       L.crypto_auth_hmacsha512256_state'malloc
+    , f "crypto_auth_hmacsha512_state"
+       L.crypto_auth_hmacsha512_state'malloc
+    , f "crypto_generichash_blake2b_state"
+       L.crypto_generichash_blake2b_state'malloc
+    , f "crypto_generichash_state"
+       L.crypto_generichash_state'malloc
+    , f "crypto_hash_sha256_state"
+       L.crypto_hash_sha256_state'malloc
+    , f "crypto_hash_sha512_state"
+       L.crypto_hash_sha512_state'malloc
+    , f "crypto_onetimeauth_poly1305_state"
+       L.crypto_onetimeauth_poly1305_state'malloc
+    , f "crypto_onetimeauth_state"
+       L.crypto_onetimeauth_state'malloc
+    , f "crypto_secretstream_xchacha20poly1305_state"
+       L.crypto_secretstream_xchacha20poly1305_state'malloc
+    , f "crypto_sign_ed25519ph_state"
+       L.crypto_sign_ed25519ph_state'malloc
+    , f "crypto_sign_state"
+       L.crypto_sign_state'malloc
+    , f "randombytes_implementation"
+       L.randombytes_implementation'malloc
+    ]
+  where
+    f :: (Storable a, Coercible a (ForeignPtr a)) => String -> IO a -> TestTree
+    f s m = testGroup s
+      [ testCase "poke" $ do
+          -- Allocate a1 and fill it with random bytes.
+          a1 :: a <- m
+          let a1fp :: ForeignPtr a = coerce a1
+          withForeignPtr a1fp $ \a1p -> do
+            L.randombytes_buf a1p (fromIntegral (sizeOf a1))
+            -- Allocate a2 and fill it with random bytes.
+            a2 :: a <- m
+            let a2fp :: ForeignPtr a = coerce a2
+            withForeignPtr a2fp $ \a2p -> do
+              fix $ \again -> do
+                L.randombytes_buf a2p (fromIntegral (sizeOf a2))
+                x <- L.sodium_memcmp a1p a2p (fromIntegral (sizeOf a2))
+                when (x == 0) again -- Strictly speaking, this /could/ happen. LOL.
+              -- Copy a1 into a2
+              poke a2p a1
+              -- We expect the bytes in a1 and a2 to contain the same bytes now
+              x <- L.sodium_memcmp a1p a2p (fromIntegral (sizeOf a2))
+              0 @=? x
+
+      , testCase "peek" $ do
+          -- Allocate a1 and fill it with random bytes.
+          a1 :: a <- m
+          let a1fp :: ForeignPtr a = coerce a1
+          withForeignPtr a1fp $ \a1p -> do
+            L.randombytes_buf a1p (fromIntegral (sizeOf a1))
+            -- Copy a1 into a newly allocated a2
+            a2 :: a <- peek a1p
+            let a2fp :: ForeignPtr a = coerce a2
+            withForeignPtr a2fp $ \a2p -> do
+              -- We expect a1p and a2p to be at different memory addresses
+              assertNotEqual "" a1p a2p
+              -- We expect a1p and a2p to contain the same bytes.
+              x <- L.sodium_memcmp a1p a2p (fromIntegral (sizeOf a1))
+              0 @=? x
+
+      , testCase "malloc" $ do
+          -- Allocate a1 and fill it with random bytes.
+          a1 :: a <- m
+          let a1fp :: ForeignPtr a = coerce a1
+          a2 :: a <- withForeignPtr a1fp $ \a1p -> do
+            fix $ \again -> do
+              L.randombytes_buf a1p (fromIntegral (sizeOf a1))
+              xa1 <- checkAllZeros a1p (fromIntegral (sizeOf a1))
+              when xa1 again -- Strictly speaking, this /could/ happen. LOL.
+            -- Copy a1 a into a newly allocated a2.
+            peek a1p
+          let a2fp :: ForeignPtr a = coerce a2
+          -- We expect a1 to be wiped when a1fp finalizes.
+          finalizeForeignPtr a1fp
+          xa1 <- withForeignPtr a1fp $ \a1p ->
+                   checkAllZeros a1p (fromIntegral (sizeOf a1))
+          True @=? xa1
+          -- We expect a2 to be wiped when a2fp finalizes.
+          finalizeForeignPtr a2fp
+          xa2 <- withForeignPtr a2fp $ \a2p ->
+                   checkAllZeros a2p (fromIntegral (sizeOf a2))
+          True @=? xa2
+      ]
+
 
 tt_core :: TestTree
 tt_core = testGroup "core.h"
@@ -451,4 +521,22 @@ tt_randombytes = testGroup "randombytes.h"
       bs <- liftIO $ replicateM n L.randombytes_random
       as /== bs
   ]
+
+checkAllZeros :: Ptr a -> CSize -> IO Bool
+checkAllZeros _ 0 = pure True
+checkAllZeros p n = peek (castPtr p) >>= \w -> case (w :: Word8) of
+                      0 -> checkAllZeros (plusPtr p 1) (n - 1)
+                      _ -> pure False
+
+assertNotEqual
+  :: (Eq a, Show a, HasCallStack)
+  => String -- ^ The message prefix
+  -> a      -- ^ The value that is not expected
+  -> a      -- ^ The actual value
+  -> Assertion
+assertNotEqual preface notExpected actual =
+  when (notExpected == actual) $ assertFailure $ join $ join
+    [ if null preface then [] else [preface, "\n" ]
+    , [ "got unexpected: ", show actual , "\n" ]
+    ]
 
