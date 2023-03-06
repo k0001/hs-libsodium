@@ -383,6 +383,9 @@ module Libsodium {--}
   --
   -- $constants
   , module Libsodium.Constants
+  -- * Extras
+  , sodium_memzero'finalizerEnv
+  , sodium_memzero'finalizerEnvFree
   ) --}
   where
 
@@ -812,6 +815,30 @@ foreign import ccall unsafe "&randombytes_internal_implementation"
 {# fun sodium_mprotect_readwrite { castPtr `addr ::: Ptr x' } -> `CInt' #}
 {# fun sodium_munlock { castPtr `addr ::: Ptr x', id `len ::: CSize' } -> `CInt' #}
 {# fun sodium_stackzero { id `len ::: CSize' } -> `()' #}
+
+--------------------------------------------------------------------------------
+-- | This 'FP.FinalizerEnvPtr' zeroes 'CSize' bytes starting at @'Ptr' a@
+-- using 'sodium_memzero', and afterwards it 'A.free's the @'Ptr' 'CSize'@.
+-- You can attach it to a 'ForeignPtr' using 'addForeignPtrFinalizerEnv'.
+--
+-- Note: If you want access to a finalizer like this without depending on
+-- all of @libsodium@, consider using the
+-- Haskell [memzero](https://hackage.haskell.org/package/memzero/docs/Memzero.html#v:finalizerEnvFree) library instead.
+foreign import ccall unsafe "hs_libsodium.h &hs_libsodium_finalizerEnvFree"
+  sodium_memzero'finalizerEnvFree :: FinalizerEnvPtr CSize a
+
+-- | This 'FP.FinalizerEnvPtr' zeroes 'CSize' bytes starting at @'Ptr' a@
+-- using 'sodium_memzero'.
+-- You can attach it to a 'ForeignPtr' using 'addForeignPtrFinalizerEnv'.
+--
+-- Contrary to 'sodium_memzero'finalizerEnvFree', this /doesn't/ 'A.free' the
+-- @'Ptr' 'CSize'@.
+--
+-- Note: If you want access to a finalizer like this without depending on
+-- all of @libsodium@, consider using the
+-- Haskell [memzero](https://hackage.haskell.org/package/memzero/docs/Memzero.html#v:finalizerEnv) library instead.
+foreign import ccall unsafe "hs_libsodium.h &hs_libsodium_finalizerEnv"
+  sodium_memzero'finalizerEnv :: FinalizerEnvPtr CSize a
 
 --------------------------------------------------------------------------------
 -- $types

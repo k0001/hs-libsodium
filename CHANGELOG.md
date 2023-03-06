@@ -6,6 +6,8 @@
 * The constructors for types such as `Crypto_aead_aes256gcm_state` are
   now exported.
 
+* Export `sodium_memzero'finalizerEnvFree` and `sodium_memzero'finalizerEnv`.
+
 * Cabal will now avoid trying to install `c2hs` if it has already been
   installed by other means.
 

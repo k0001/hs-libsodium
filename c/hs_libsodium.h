@@ -16,3 +16,10 @@ void hs_libsodium_finalizer_crypto_secretstream_xchacha20poly1305_state(crypto_s
 void hs_libsodium_finalizer_crypto_sign_ed25519ph_state(crypto_sign_ed25519ph_state * p);
 void hs_libsodium_finalizer_crypto_sign_state(crypto_sign_state * p);
 void hs_libsodium_finalizer_randombytes_implementation(randombytes_implementation * p);
+
+// Zeroes `*size` bytes starting at `p`, and then `free()`s `size`.
+void hs_libsodium_finalizerEnvFree(size_t * size, void * p);
+
+// Zeroes `*size` bytes starting at `p`.
+void hs_libsodium_finalizerEnv(size_t * size, void * p);
+

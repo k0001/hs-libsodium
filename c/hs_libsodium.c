@@ -55,3 +55,12 @@ void hs_libsodium_finalizer_crypto_sign_state(crypto_sign_state * p) {
 void hs_libsodium_finalizer_randombytes_implementation(randombytes_implementation * p) {
   sodium_memzero(p, sizeof(*p));
 }
+
+void hs_libsodium_finalizerEnvFree(size_t * size, void * p) {
+  sodium_memzero(p, *size);
+  free(size);
+}
+
+void hs_libsodium_finalizerEnv(size_t * size, void * p) {
+  sodium_memzero(p, *size);
+}

@@ -2,26 +2,29 @@
 
 module Main (main) where
 
+import Control.Exception (bracketOnError)
 import Control.Monad
 import Control.Monad.IO.Class
 import Data.Coerce
-import Data.Word
 import Data.Function (fix)
+import Data.Word
 import Foreign.C.String
 import Foreign.C.Types
-import Foreign.Ptr
 import Foreign.ForeignPtr
+import Foreign.Marshal.Alloc (alloca, malloc, free)
+import Foreign.Ptr
 import Foreign.Storable
-import qualified Test.Tasty as Tasty
-import qualified Test.Tasty.Runners as Tasty
-import Test.Tasty (TestTree, testGroup)
-import Test.Tasty.HUnit (Assertion, HasCallStack, assertFailure,
-  testCase, (@=?), (@?))
-import Test.Tasty.Hedgehog (testProperty)
+import GHC.Stack (HasCallStack)
 import Hedgehog (property, forAll, (/==), diff)
-import qualified Hedgehog.Gen as Gen
-import qualified Hedgehog.Range as Range
-import qualified Libsodium as L
+import Hedgehog.Gen qualified as Gen
+import Hedgehog.Range qualified as Range
+import Test.Tasty (TestTree, testGroup)
+import Test.Tasty qualified as Tasty
+import Test.Tasty.HUnit (Assertion, assertFailure, testCase, (@=?), (@?))
+import Test.Tasty.Hedgehog (testProperty)
+import Test.Tasty.Runners qualified as Tasty
+
+import Libsodium qualified as L
 
 --------------------------------------------------------------------------------
 
@@ -114,7 +117,8 @@ tt_memory = testGroup "Memory"
        L.randombytes_implementation'malloc
     ]
   where
-    f :: (Storable a, Coercible a (ForeignPtr a)) => String -> IO a -> TestTree
+    f :: forall a. (Storable a, Coercible a (ForeignPtr a))
+      => String -> IO a -> TestTree
     f s m = testGroup s
       [ testCase "poke" $ do
           -- Allocate a1 and fill it with random bytes.
@@ -152,7 +156,7 @@ tt_memory = testGroup "Memory"
               x <- L.sodium_memcmp a1p a2p (fromIntegral (sizeOf a1))
               0 @=? x
 
-      , testCase "malloc" $ do
+      , testCase "xxx'malloc" $ do
           -- Allocate a1 and fill it with random bytes.
           a1 :: a <- m
           let a1fp :: ForeignPtr a = coerce a1
@@ -174,6 +178,44 @@ tt_memory = testGroup "Memory"
           xa2 <- withForeignPtr a2fp $ \a2p ->
                    checkAllZeros a2p (fromIntegral (sizeOf a2))
           True @=? xa2
+
+      , testCase "finalizerEnvFree" $ do
+          -- Allocate some memory to hold the size
+          let a1size :: CSize = fromIntegral (sizeOf (undefined :: a))
+          alloca $ \a1sizep -> do
+            poke a1sizep a1size
+            -- Allocate a1, attach finalizer, fill it with random bytes.
+            a1fp :: ForeignPtr a <- mallocForeignPtr
+            addForeignPtrFinalizerEnv
+              L.sodium_memzero'finalizerEnv a1sizep a1fp
+            withForeignPtr a1fp $ \a1p -> do
+              fix $ \again -> do
+                L.randombytes_buf a1p a1size
+                xa1 <- checkAllZeros a1p a1size
+                when xa1 again -- Strictly speaking, this /could/ happen. LOL.
+            -- We expect a1 to be wiped when a1fp finalizes.
+            finalizeForeignPtr a1fp
+            xa1 <- withForeignPtr a1fp $ \a1p -> checkAllZeros a1p a1size
+            True @=? xa1
+
+      , testCase "finalizerEnvFree" $ do
+          -- Allocate some memory to hold the size
+          let a1size :: CSize = fromIntegral (sizeOf (undefined :: a))
+          bracketOnError malloc free $ \a1sizep -> do
+            poke a1sizep a1size
+            -- Allocate a1, attach finalizer, fill it with random bytes.
+            a1fp :: ForeignPtr a <- mallocForeignPtr
+            addForeignPtrFinalizerEnv
+              L.sodium_memzero'finalizerEnvFree a1sizep a1fp
+            withForeignPtr a1fp $ \a1p -> do
+              fix $ \again -> do
+                L.randombytes_buf a1p a1size
+                xa1 <- checkAllZeros a1p a1size
+                when xa1 again -- Strictly speaking, this /could/ happen. LOL.
+            -- We expect a1 to be wiped when a1fp finalizes.
+            finalizeForeignPtr a1fp
+            xa1 <- withForeignPtr a1fp $ \a1p -> checkAllZeros a1p a1size
+            True @=? xa1
       ]
 
 
