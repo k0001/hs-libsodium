@@ -1,4 +1,6 @@
-compiler: ghc
+profiling: True
+profiling-detail: all-functions
+optimization: True
+documentation: True
 tests: True
-packages:
-  libsodium/
+packages: ./

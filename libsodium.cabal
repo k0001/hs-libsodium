@@ -1,6 +1,6 @@
 cabal-version: 2.4
 name: libsodium
-version: 1.0.18.2
+version: 1.0.18.3
 license: ISC
 license-file: LICENSE
 extra-source-files: README.md CHANGELOG.md
@@ -13,14 +13,25 @@ synopsis: Low-level bindings to the libsodium C library
 description: Low-level bindings to the libsodium C library
 homepage: https://github.com/k0001/hs-libsodium
 bug-reports: https://github.com/k0001/hs-libsodium/issues
-tested-with: GHC == 8.6.5, GHC == 8.8.3, GHC == 8.10.1
+tested-with: GHC ==9.2.6
+
+flag use-build-tool-depends
+  description: Sometimes Cabal doesn't see build tools listed in
+    build-tool-depends if they are installed by means other than
+    cabal-install (e.g., Nix). In those cases, not even mentioning
+    the tools in build-tool-depends prevents cabal-install from
+    attempting to reinstall them. This is an automatic flag, so
+    in theory Cabal will figure out what it needs to do.
+  default: False
+  manual: False
 
 common basic
   default-language: Haskell2010
   ghc-options: -Wall -Werror=incomplete-patterns
   build-depends: base == 4.*
   pkgconfig-depends: libsodium == 1.0.18
-  build-tool-depends: c2hs:c2hs
+  if flag(use-build-tool-depends)
+    build-tool-depends: c2hs:c2hs
 
 library
   import: basic
@@ -31,8 +42,7 @@ library
 test-suite test
   import: basic
   type: exitcode-stdio-1.0
-  hs-source-dirs: test
-  main-is: Main.hs
+  main-is: test.hs
   build-depends:
     hedgehog,
     libsodium,
