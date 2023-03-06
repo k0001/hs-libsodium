@@ -243,6 +243,8 @@ tt_constants_numbers = testGroup "numbers"
   , t "crypto_aead_aes256gcm_npubbytes" L.crypto_aead_aes256gcm_npubbytes {# call pure unsafe crypto_aead_aes256gcm_npubbytes #}
   , t "crypto_aead_aes256gcm_nsecbytes" L.crypto_aead_aes256gcm_nsecbytes {# call pure unsafe crypto_aead_aes256gcm_nsecbytes #}
   , t "crypto_aead_aes256gcm_statebytes" L.crypto_aead_aes256gcm_statebytes {# call pure unsafe crypto_aead_aes256gcm_statebytes #}
+  , t "crypto_aead_aes256gcm_statebytes'" L.crypto_aead_aes256gcm_statebytes {# sizeof crypto_aead_aes256gcm_state #}
+  , t "crypto_aead_aes256gcm_statealignment'" L.crypto_aead_aes256gcm_statealignment {# alignof crypto_aead_aes256gcm_state #}
   , t "crypto_aead_chacha20poly1305_abytes" L.crypto_aead_chacha20poly1305_abytes {# call pure unsafe crypto_aead_chacha20poly1305_abytes #}
   , t "crypto_aead_chacha20poly1305_ietf_abytes" L.crypto_aead_chacha20poly1305_ietf_abytes {# call pure unsafe crypto_aead_chacha20poly1305_ietf_abytes #}
   , t "crypto_aead_chacha20poly1305_ietf_keybytes" L.crypto_aead_chacha20poly1305_ietf_keybytes {# call pure unsafe crypto_aead_chacha20poly1305_ietf_keybytes #}
@@ -262,12 +264,18 @@ tt_constants_numbers = testGroup "numbers"
   , t "crypto_auth_hmacsha256_bytes" L.crypto_auth_hmacsha256_bytes {# call pure unsafe crypto_auth_hmacsha256_bytes #}
   , t "crypto_auth_hmacsha256_keybytes" L.crypto_auth_hmacsha256_keybytes {# call pure unsafe crypto_auth_hmacsha256_keybytes #}
   , t "crypto_auth_hmacsha256_statebytes" L.crypto_auth_hmacsha256_statebytes {# call pure unsafe crypto_auth_hmacsha256_statebytes #}
+  , t "crypto_auth_hmacsha256_statebytes'" L.crypto_auth_hmacsha256_statebytes {# sizeof crypto_auth_hmacsha256_state #}
+  , t "crypto_auth_hmacsha256_statealignment'" L.crypto_auth_hmacsha256_statealignment {# alignof crypto_auth_hmacsha256_state #}
   , t "crypto_auth_hmacsha512256_bytes" L.crypto_auth_hmacsha512256_bytes {# call pure unsafe crypto_auth_hmacsha512256_bytes #}
   , t "crypto_auth_hmacsha512256_keybytes" L.crypto_auth_hmacsha512256_keybytes {# call pure unsafe crypto_auth_hmacsha512256_keybytes #}
   , t "crypto_auth_hmacsha512256_statebytes" L.crypto_auth_hmacsha512256_statebytes {# call pure unsafe crypto_auth_hmacsha512256_statebytes #}
+  , t "crypto_auth_hmacsha512256_statebytes'" L.crypto_auth_hmacsha512256_statebytes {# sizeof crypto_auth_hmacsha512256_state#}
+  , t "crypto_auth_hmacsha512256_statealignment'" L.crypto_auth_hmacsha512256_statealignment {# alignof crypto_auth_hmacsha512256_state#}
   , t "crypto_auth_hmacsha512_bytes" L.crypto_auth_hmacsha512_bytes {# call pure unsafe crypto_auth_hmacsha512_bytes #}
   , t "crypto_auth_hmacsha512_keybytes" L.crypto_auth_hmacsha512_keybytes {# call pure unsafe crypto_auth_hmacsha512_keybytes #}
   , t "crypto_auth_hmacsha512_statebytes" L.crypto_auth_hmacsha512_statebytes {# call pure unsafe crypto_auth_hmacsha512_statebytes #}
+  , t "crypto_auth_hmacsha512_statebytes'" L.crypto_auth_hmacsha512_statebytes {# sizeof crypto_auth_hmacsha512_state #}
+  , t "crypto_auth_hmacsha512_statealignment'" L.crypto_auth_hmacsha512_statealignment {# alignof crypto_auth_hmacsha512_state #}
   , t "crypto_auth_keybytes" L.crypto_auth_keybytes {# call pure unsafe crypto_auth_keybytes #}
   , t "crypto_box_beforenmbytes" L.crypto_box_beforenmbytes {# call pure unsafe crypto_box_beforenmbytes #}
   , t "crypto_box_boxzerobytes" L.crypto_box_boxzerobytes {# call pure unsafe crypto_box_boxzerobytes #}
@@ -334,6 +342,8 @@ tt_constants_numbers = testGroup "numbers"
   , t "crypto_generichash_blake2b_personalbytes" L.crypto_generichash_blake2b_personalbytes {# call pure unsafe crypto_generichash_blake2b_personalbytes #}
   , t "crypto_generichash_blake2b_saltbytes" L.crypto_generichash_blake2b_saltbytes {# call pure unsafe crypto_generichash_blake2b_saltbytes #}
   , t "crypto_generichash_blake2b_statebytes" L.crypto_generichash_blake2b_statebytes {# call pure unsafe crypto_generichash_blake2b_statebytes #}
+  , t "crypto_generichash_blake2b_statebytes'" L.crypto_generichash_blake2b_statebytes {# sizeof crypto_generichash_blake2b_state #}
+  , t "crypto_generichash_blake2b_statealignment'" L.crypto_generichash_blake2b_statealignment {# alignof crypto_generichash_blake2b_state #}
   , t "crypto_generichash_bytes" L.crypto_generichash_bytes {# call pure unsafe crypto_generichash_bytes #}
   , t "crypto_generichash_bytes_max" L.crypto_generichash_bytes_max {# call pure unsafe crypto_generichash_bytes_max #}
   , t "crypto_generichash_bytes_min" L.crypto_generichash_bytes_min {# call pure unsafe crypto_generichash_bytes_min #}
@@ -344,8 +354,12 @@ tt_constants_numbers = testGroup "numbers"
   , t "crypto_hash_bytes" L.crypto_hash_bytes {# call pure unsafe crypto_hash_bytes #}
   , t "crypto_hash_sha256_bytes" L.crypto_hash_sha256_bytes {# call pure unsafe crypto_hash_sha256_bytes #}
   , t "crypto_hash_sha256_statebytes" L.crypto_hash_sha256_statebytes {# call pure unsafe crypto_hash_sha256_statebytes #}
+  , t "crypto_hash_sha256_statebytes'" L.crypto_hash_sha256_statebytes {# sizeof crypto_hash_sha256_state #}
+  , t "crypto_hash_sha256_statealignment'" L.crypto_hash_sha256_statealignment {# alignof crypto_hash_sha256_state #}
   , t "crypto_hash_sha512_bytes" L.crypto_hash_sha512_bytes {# call pure unsafe crypto_hash_sha512_bytes #}
   , t "crypto_hash_sha512_statebytes" L.crypto_hash_sha512_statebytes {# call pure unsafe crypto_hash_sha512_statebytes #}
+  , t "crypto_hash_sha512_statebytes'" L.crypto_hash_sha512_statebytes {# sizeof crypto_hash_sha512_state #}
+  , t "crypto_hash_sha512_statealignment'" L.crypto_hash_sha512_statealignment {# alignof crypto_hash_sha512_state #}
   , t "crypto_kdf_blake2b_bytes_max" L.crypto_kdf_blake2b_bytes_max {# call pure unsafe crypto_kdf_blake2b_bytes_max #}
   , t "crypto_kdf_blake2b_bytes_min" L.crypto_kdf_blake2b_bytes_min {# call pure unsafe crypto_kdf_blake2b_bytes_min #}
   , t "crypto_kdf_blake2b_contextbytes" L.crypto_kdf_blake2b_contextbytes {# call pure unsafe crypto_kdf_blake2b_contextbytes #}
@@ -363,6 +377,8 @@ tt_constants_numbers = testGroup "numbers"
   , t "crypto_onetimeauth_poly1305_bytes" L.crypto_onetimeauth_poly1305_bytes {# call pure unsafe crypto_onetimeauth_poly1305_bytes #}
   , t "crypto_onetimeauth_poly1305_keybytes" L.crypto_onetimeauth_poly1305_keybytes {# call pure unsafe crypto_onetimeauth_poly1305_keybytes #}
   , t "crypto_onetimeauth_poly1305_statebytes" L.crypto_onetimeauth_poly1305_statebytes {# call pure unsafe crypto_onetimeauth_poly1305_statebytes #}
+  , t "crypto_onetimeauth_poly1305_statebytes'" L.crypto_onetimeauth_poly1305_statebytes {# sizeof crypto_onetimeauth_poly1305_state #}
+  , t "crypto_onetimeauth_poly1305_statealignment'" L.crypto_onetimeauth_poly1305_statealignment {# alignof crypto_onetimeauth_poly1305_state #}
   , t "crypto_onetimeauth_statebytes" L.crypto_onetimeauth_statebytes {# call pure unsafe crypto_onetimeauth_statebytes #}
   , t "crypto_pwhash_alg_argon2i13" L.crypto_pwhash_alg_argon2i13 {# call pure unsafe crypto_pwhash_alg_argon2i13 #}
   , t "crypto_pwhash_alg_argon2id13" L.crypto_pwhash_alg_argon2id13 {# call pure unsafe crypto_pwhash_alg_argon2id13 #}
@@ -460,6 +476,8 @@ tt_constants_numbers = testGroup "numbers"
   , t "crypto_secretstream_xchacha20poly1305_keybytes" L.crypto_secretstream_xchacha20poly1305_keybytes {# call pure unsafe crypto_secretstream_xchacha20poly1305_keybytes #}
   , t "crypto_secretstream_xchacha20poly1305_messagebytes_max" L.crypto_secretstream_xchacha20poly1305_messagebytes_max {# call pure unsafe crypto_secretstream_xchacha20poly1305_messagebytes_max #}
   , t "crypto_secretstream_xchacha20poly1305_statebytes" L.crypto_secretstream_xchacha20poly1305_statebytes {# call pure unsafe crypto_secretstream_xchacha20poly1305_statebytes #}
+  , t "crypto_secretstream_xchacha20poly1305_statebytes'" L.crypto_secretstream_xchacha20poly1305_statebytes {# sizeof crypto_secretstream_xchacha20poly1305_state #}
+  , t "crypto_secretstream_xchacha20poly1305_statealignment'" L.crypto_secretstream_xchacha20poly1305_statealignment {# alignof crypto_secretstream_xchacha20poly1305_state #}
   , t "crypto_secretstream_xchacha20poly1305_tag_final" L.crypto_secretstream_xchacha20poly1305_tag_final {# call pure unsafe crypto_secretstream_xchacha20poly1305_tag_final #}
   , t "crypto_secretstream_xchacha20poly1305_tag_message" L.crypto_secretstream_xchacha20poly1305_tag_message {# call pure unsafe crypto_secretstream_xchacha20poly1305_tag_message #}
   , t "crypto_secretstream_xchacha20poly1305_tag_push" L.crypto_secretstream_xchacha20poly1305_tag_push {# call pure unsafe crypto_secretstream_xchacha20poly1305_tag_push #}
@@ -474,6 +492,8 @@ tt_constants_numbers = testGroup "numbers"
   , t "crypto_sign_ed25519_bytes" L.crypto_sign_ed25519_bytes {# call pure unsafe crypto_sign_ed25519_bytes #}
   , t "crypto_sign_ed25519_messagebytes_max" L.crypto_sign_ed25519_messagebytes_max {# call pure unsafe crypto_sign_ed25519_messagebytes_max #}
   , t "crypto_sign_ed25519ph_statebytes" L.crypto_sign_ed25519ph_statebytes {# call pure unsafe crypto_sign_ed25519ph_statebytes #}
+  , t "crypto_sign_ed25519ph_statebytes'" L.crypto_sign_ed25519ph_statebytes {# sizeof crypto_sign_ed25519ph_state #}
+  , t "crypto_sign_ed25519ph_statealignment'" L.crypto_sign_ed25519ph_statealignment {# alignof crypto_sign_ed25519ph_state #}
   , t "crypto_sign_ed25519_publickeybytes" L.crypto_sign_ed25519_publickeybytes {# call pure unsafe crypto_sign_ed25519_publickeybytes #}
   , t "crypto_sign_ed25519_secretkeybytes" L.crypto_sign_ed25519_secretkeybytes {# call pure unsafe crypto_sign_ed25519_secretkeybytes #}
   , t "crypto_sign_ed25519_seedbytes" L.crypto_sign_ed25519_seedbytes {# call pure unsafe crypto_sign_ed25519_seedbytes #}

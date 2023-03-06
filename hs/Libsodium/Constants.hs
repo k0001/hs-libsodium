@@ -306,6 +306,21 @@ TN(SODIUM_BASE64_VARIANT_ORIGINAL_NO_PADDING, 3, CInt, sodium_base64_variant_ori
 TN(SODIUM_BASE64_VARIANT_URLSAFE, 5, CInt, sodium_base64_variant_urlsafe)
 TN(SODIUM_BASE64_VARIANT_URLSAFE_NO_PADDING, 7, CInt, sodium_base64_variant_urlsafe_no_padding)
 
+-- These are not exported by libsodium, but we export them for convenience.
+TN(CRYPTO_AEAD_AES256GCM_STATEALIGNMENT, 1, CSize, crypto_aead_aes256gcm_statealignment)
+TN(CRYPTO_AUTH_HMACSHA256_STATEALIGNMENT, 8, CSize, crypto_auth_hmacsha256_statealignment)
+TN(CRYPTO_AUTH_HMACSHA512256_STATEALIGNMENT, 8, CSize, crypto_auth_hmacsha512256_statealignment)
+TN(CRYPTO_AUTH_HMACSHA512_STATEALIGNMENT, 8, CSize, crypto_auth_hmacsha512_statealignment)
+TN(CRYPTO_GENERICHASH_BLAKE2B_STATEALIGNMENT, 1, CSize, crypto_generichash_blake2b_statealignment)
+TN(CRYPTO_GENERICHASH_STATEALIGNMENT, 1, CSize, crypto_generichash_statealignment)
+TN(CRYPTO_HASH_SHA256_STATEALIGNMENT, 8, CSize, crypto_hash_sha256_statealignment)
+TN(CRYPTO_HASH_SHA512_STATEALIGNMENT, 8, CSize, crypto_hash_sha512_statealignment)
+TN(CRYPTO_ONETIMEAUTH_POLY1305_STATEALIGNMENT, 1, CSize, crypto_onetimeauth_poly1305_statealignment)
+TN(CRYPTO_ONETIMEAUTH_STATEALIGNMENT, 1, CSize, crypto_onetimeauth_statealignment)
+TN(CRYPTO_SECRETSTREAM_XCHACHA20POLY1305_STATEALIGNMENT, 1, CSize, crypto_secretstream_xchacha20poly1305_statealignment)
+TN(CRYPTO_SIGN_ED25519PH_STATEALIGNMENT, 8, CSize, crypto_sign_ed25519ph_statealignment)
+TN(CRYPTO_SIGN_STATEALIGNMENT, 1, CSize, crypto_sign_statealignment)
+
 --------------------------------------------------------------------------------
 -- String constants
 

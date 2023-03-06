@@ -8,6 +8,8 @@
 
 * Export `sodium_memzero'finalizerEnvFree` and `sodium_memzero'finalizerEnv`.
 
+* Export type-level constants with the memory alignments for state types.
+
 * Cabal will now avoid trying to install `c2hs` if it has already been
   installed by other means.
 
