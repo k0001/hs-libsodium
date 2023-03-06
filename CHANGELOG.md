@@ -1,7 +1,7 @@
 # Version 1.0.18.3
 
 * Allocation tools such as `crypto_aead_aes256gcm_state'malloc` now
-  automaticalaly zero the allocated memory once it becomes unreachable.
+  automatically zero the allocated memory once it becomes unreachable.
 
 * The constructors for types such as `Crypto_aead_aes256gcm_state` are
   now exported.
