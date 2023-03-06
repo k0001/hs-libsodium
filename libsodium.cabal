@@ -24,7 +24,7 @@ flag use-build-tool-depends
     the tools in build-tool-depends prevents cabal-install from
     attempting to reinstall them. This is an automatic flag, so
     in theory Cabal will figure out what it needs to do.
-  default: False
+  default: True
   manual: False
 
 common basic

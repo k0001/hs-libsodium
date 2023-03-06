@@ -4,3 +4,6 @@ optimization: True
 documentation: True
 tests: True
 packages: ./
+package libsodium
+  flags: -use-build-tool-depends
+

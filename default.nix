@@ -14,4 +14,5 @@ mkDerivation {
   description = "Low-level bindings to the libsodium C library";
   license = lib.licenses.isc;
   doCheck = true;
+  configureFlags = [ "--flags=-use-build-tool-depends" ];
 }
